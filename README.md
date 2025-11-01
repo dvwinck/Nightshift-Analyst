@@ -5,6 +5,7 @@ Detective-themed narrative game that blends investigation mechanics with narrati
 ## Project Structure
 
 - `backend/` – FastAPI backend service with PostgreSQL, Redis, and Celery integrations (see `backend/README.md` for full docs)
+- `frontend/` – Vite + React client for authentication and case management dashboards
 - `DGD/` – Game design document (`Game Design Document — Nightshift_ Analyst.pdf`)
 - `LICENSE` – MIT license for the project
 
@@ -28,6 +29,14 @@ Detective-themed narrative game that blends investigation mechanics with narrati
    - ReDoc: http://localhost:8000/redoc
 
 Refer to `backend/README.md` for local (non-Docker) setup, testing, linting, and deployment tips.
+
+4. **Run the frontend**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   By default the client points to `http://localhost:8000/api/v1`. Override with `VITE_API_BASE_URL` in a `.env` file if your backend runs elsewhere.
 
 ## Game Design Document
 
