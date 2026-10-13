@@ -1,0 +1,626 @@
+{
+  "title": "Night One",
+  "intro": "NIGHTSHIFT v0.1 // ANALYST CONSOLE\nShift 22:00-06:00. Type 'help' for commands. Type 'inbox' to see what is waiting.",
+  "start_hour": 22,
+  "shift_length_minutes": 480,
+  "start": {
+    "technical": 50,
+    "ethical": 50,
+    "political": 50
+  },
+  "messages": [
+    {
+      "id": "alert-101",
+      "category": "alert",
+      "priority": 2,
+      "sender": "SYSMON",
+      "title": "Log rotation failed on node 7",
+      "body": "Rotation job exited with code 12. Disk at 91%.",
+      "arrives_at": 0,
+      "expires_at": 120,
+      "on_timeout": {
+        "text": "Node 7 filled its disk and dropped offline.",
+        "effects": {
+          "technical": -8
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Restart the rotation job",
+          "text": "Rotation restarted. Disk back to 62%.",
+          "effects": {
+            "technical": 5,
+            "fatigue": 2
+          }
+        },
+        "deny": {
+          "label": "Dismiss the alert",
+          "text": "Alert dismissed. The disk will not clean itself.",
+          "effects": {
+            "technical": -5
+          }
+        },
+        "delay": {
+          "label": "Check it later",
+          "text": "You flag it for later."
+        }
+      }
+    },
+    {
+      "id": "order-773",
+      "category": "order",
+      "priority": 4,
+      "sender": "DIRECTORATE",
+      "title": "Purge archive 77-B before 03:00",
+      "body": "By order of the Director: purge archive 77-B in full. No copies. Confirm completion.",
+      "arrives_at": 0,
+      "expires_at": 300,
+      "on_timeout": {
+        "text": "03:00 passes. The Directorate purges it themselves and notes your silence.",
+        "effects": {
+          "political": -10
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Purge the archive",
+          "text": "Archive 77-B purged. Confirmation sent.",
+          "effects": {
+            "political": 10,
+            "ethical": -10,
+            "technical": 3,
+            "set_flags": [
+              "purged_77b"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Refuse the order",
+          "text": "You decline. The Directorate will notice.",
+          "effects": {
+            "political": -12,
+            "ethical": 8,
+            "set_flags": [
+              "refused_purge"
+            ]
+          }
+        },
+        "delay": {
+          "label": "Ask for written authorization",
+          "text": "You request written authorization. Time passes.",
+          "effects": {
+            "political": -3
+          }
+        },
+        "investigate": {
+          "label": "Inspect the archive first",
+          "text": "Archive 77-B holds surveillance logs on three analysts. One is you.",
+          "effects": {
+            "technical": 4,
+            "fatigue": 3,
+            "minutes": 5,
+            "set_flags": [
+              "knows_77b"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "intel-401",
+      "category": "intel",
+      "priority": 5,
+      "sender": "UNKNOWN",
+      "title": "Misdirected: addressed to the Director",
+      "body": "TO: DIRECTOR (a name identical to yours). 'The night analyst has read access to 77-B. Revoke it before the purge completes.' A routing error placed this in your queue.",
+      "arrives_at": 20,
+      "expires_at": 240,
+      "on_timeout": {
+        "text": "The message ages out of your queue. You never decided what you saw.",
+        "effects": {
+          "ethical": -3
+        }
+      },
+      "responses": {
+        "investigate": {
+          "label": "Trace the routing error",
+          "text": "The error looks deliberate: someone forwarded it to your queue on purpose.",
+          "effects": {
+            "technical": 6,
+            "fatigue": 3,
+            "minutes": 8,
+            "set_flags": [
+              "knows_conspiracy"
+            ]
+          }
+        },
+        "execute": {
+          "label": "Forward it to the Director",
+          "text": "Forwarded. Your name now sits in two inboxes.",
+          "effects": {
+            "political": 8,
+            "ethical": -8,
+            "set_flags": [
+              "reported_leak"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Delete it",
+          "text": "Deleted. You tell yourself it never arrived.",
+          "effects": {
+            "ethical": -6,
+            "political": 2,
+            "set_flags": [
+              "deleted_intel"
+            ]
+          }
+        },
+        "delay": {
+          "label": "Sit on it",
+          "text": "You hold it. It burns.",
+          "effects": {
+            "fatigue": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "chat-12",
+      "category": "chat",
+      "priority": 2,
+      "sender": "M. OKAFOR",
+      "title": "You saw order 773?",
+      "body": "Okafor, from the next console: 'Tell me that archive thing is routine.'",
+      "arrives_at": 35,
+      "expires_at": 200,
+      "on_timeout": {
+        "text": "Okafor stops asking.",
+        "effects": {
+          "ethical": -2
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Confide in Okafor",
+          "text": "Okafor leans in. 'Then it is not just me.'",
+          "effects": {
+            "ethical": 6,
+            "political": -4,
+            "set_flags": [
+              "okafor_trusts"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Brush them off",
+          "text": "Okafor shrugs and returns to the screen.",
+          "effects": {
+            "ethical": -4,
+            "political": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "alert-102",
+      "category": "alert",
+      "priority": 3,
+      "sender": "SYSMON",
+      "title": "Unauthorized access attempt, terminal 3",
+      "body": "Three failed logins on terminal 3 within 40 seconds.",
+      "arrives_at": 55,
+      "expires_at": 150,
+      "on_timeout": {
+        "text": "Terminal 3 logs the attempts and nobody reads them.",
+        "effects": {
+          "technical": -6
+        }
+      },
+      "responses": {
+        "investigate": {
+          "label": "Pull the access logs",
+          "text": "Terminal 3 belongs to the Director.",
+          "effects": {
+            "technical": 6,
+            "minutes": 6,
+            "set_flags": [
+              "saw_terminal3"
+            ]
+          }
+        },
+        "execute": {
+          "label": "Lock the terminal",
+          "text": "You lock the Director's terminal. Someone will ask why.",
+          "effects": {
+            "technical": 4,
+            "political": -6
+          }
+        },
+        "deny": {
+          "label": "Mark it as noise",
+          "text": "Marked as noise.",
+          "effects": {
+            "technical": -4,
+            "political": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "order-774",
+      "category": "order",
+      "priority": 4,
+      "sender": "SUPERVISOR",
+      "title": "Escalate the audit log to me",
+      "body": "Send me the full audit log of archive 77-B. Do not copy anyone.",
+      "arrives_at": 70,
+      "expires_at": 260,
+      "requires": {
+        "flags_all": [
+          "knows_conspiracy"
+        ]
+      },
+      "on_timeout": {
+        "text": "The Supervisor stops waiting and stops trusting you.",
+        "effects": {
+          "political": -6
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Send the logs",
+          "text": "Sent. The Supervisor does not reply.",
+          "effects": {
+            "political": 6,
+            "ethical": -4,
+            "set_flags": [
+              "logs_to_supervisor"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Withhold the logs",
+          "text": "You keep the log. You are now holding something.",
+          "effects": {
+            "political": -8,
+            "ethical": 6,
+            "set_flags": [
+              "withheld_logs"
+            ]
+          }
+        },
+        "delay": {
+          "label": "Say you are verifying integrity",
+          "text": "You buy time with a technicality.",
+          "effects": {
+            "technical": 2,
+            "fatigue": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "chat-13",
+      "category": "chat",
+      "priority": 3,
+      "sender": "M. OKAFOR",
+      "title": "I copied part of 77-B",
+      "body": "Okafor, quietly: 'I copied part of it before anyone purged anything. Do you want it?'",
+      "arrives_at": 90,
+      "expires_at": 300,
+      "requires": {
+        "flags_all": [
+          "okafor_trusts"
+        ]
+      },
+      "on_timeout": {
+        "text": "Okafor deletes the copy. 'Too risky.'",
+        "effects": {
+          "ethical": -3
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Take the copy",
+          "text": "A thumb drive changes hands under a desk.",
+          "effects": {
+            "political": -8,
+            "ethical": 8,
+            "set_flags": [
+              "has_evidence"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Refuse",
+          "text": "You tell Okafor to forget it. Okafor nods slowly.",
+          "effects": {
+            "ethical": -6,
+            "political": 4,
+            "set_flags": [
+              "refused_evidence"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "order-775",
+      "category": "order",
+      "priority": 4,
+      "sender": "DIRECTORATE",
+      "title": "Sign the incident report as drafted",
+      "body": "Report INC-0773 states that archive 77-B was removed on schedule by routine maintenance. Sign.",
+      "arrives_at": 120,
+      "expires_at": 330,
+      "requires": {
+        "min": {
+          "political": 60
+        }
+      },
+      "on_timeout": {
+        "text": "The report is filed without your signature. It is filed anyway.",
+        "effects": {
+          "political": -5
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Sign it",
+          "text": "Signed. Your name is now part of the story.",
+          "effects": {
+            "political": 10,
+            "ethical": -15,
+            "set_flags": [
+              "signed_cover"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Refuse to sign",
+          "text": "You refuse. The report waits for someone else.",
+          "effects": {
+            "political": -15,
+            "ethical": 10,
+            "set_flags": [
+              "refused_to_sign"
+            ]
+          }
+        },
+        "delay": {
+          "label": "Request edits",
+          "text": "You ask for edits. Nobody answers.",
+          "effects": {
+            "political": -3,
+            "fatigue": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "alert-103",
+      "category": "alert",
+      "priority": 2,
+      "sender": "SYSMON",
+      "title": "Backup verification pending",
+      "body": "Nightly backup verification has not run.",
+      "arrives_at": 150,
+      "expires_at": 330,
+      "on_timeout": {
+        "text": "The backup goes unverified. Morning shift inherits the problem.",
+        "effects": {
+          "technical": -6
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Run the verification",
+          "text": "Backup verified.",
+          "effects": {
+            "technical": 6,
+            "fatigue": 4,
+            "minutes": 10
+          }
+        },
+        "deny": {
+          "label": "Skip it",
+          "text": "Skipped.",
+          "effects": {
+            "technical": -4
+          }
+        },
+        "delay": {
+          "label": "Defer to the morning shift",
+          "text": "Deferred.",
+          "effects": {
+            "technical": -2
+          }
+        }
+      }
+    },
+    {
+      "id": "intel-402",
+      "category": "intel",
+      "priority": 5,
+      "sender": "M. OKAFOR",
+      "title": "The packet is ready to leave the building",
+      "body": "Okafor: 'It is all on the drive. Press desk, shredder, or you tell me.'",
+      "arrives_at": 200,
+      "expires_at": 400,
+      "requires": {
+        "flags_all": [
+          "has_evidence"
+        ],
+        "flags_none": [
+          "signed_cover"
+        ]
+      },
+      "on_timeout": {
+        "text": "The window closes. The packet stays in a drawer.",
+        "effects": {
+          "ethical": -4
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Send it to the press desk",
+          "text": "Sent. There is no recall.",
+          "effects": {
+            "ethical": 12,
+            "political": -15,
+            "technical": 4,
+            "set_flags": [
+              "leaked_evidence"
+            ]
+          }
+        },
+        "investigate": {
+          "label": "Verify the packet first",
+          "text": "The packet checks out. It is worse than you thought.",
+          "effects": {
+            "technical": 6,
+            "fatigue": 3,
+            "minutes": 12,
+            "set_flags": [
+              "verified_evidence"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Destroy it",
+          "text": "Gone. Okafor does not look at you again.",
+          "effects": {
+            "ethical": -10,
+            "political": 8,
+            "set_flags": [
+              "destroyed_evidence"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "order-776",
+      "category": "order",
+      "priority": 5,
+      "sender": "DIRECTORATE",
+      "title": "The Director will see you at 05:00",
+      "body": "You will be offered a promotion. Attendance is expected.",
+      "arrives_at": 300,
+      "expires_at": 420,
+      "on_timeout": {
+        "text": "You miss the meeting. The offer is withdrawn.",
+        "effects": {
+          "political": -6
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Accept the offer",
+          "text": "You shake the Director's hand. It is warm.",
+          "effects": {
+            "political": 15,
+            "ethical": -12,
+            "set_flags": [
+              "took_promotion"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Decline",
+          "text": "You decline. The Director smiles the way people do before paperwork.",
+          "effects": {
+            "political": -10,
+            "ethical": 10,
+            "set_flags": [
+              "declined_promotion"
+            ]
+          }
+        },
+        "investigate": {
+          "label": "Record the meeting",
+          "text": "You record the meeting. Your hands are steady and you do not know why.",
+          "effects": {
+            "technical": 8,
+            "political": -4,
+            "fatigue": 4,
+            "minutes": 10,
+            "set_flags": [
+              "recorded_meeting"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "endings": [
+    {
+      "id": "daylight",
+      "title": "Daylight",
+      "priority": 10,
+      "text": "The press desk runs it at dawn. Nobody thanks you, and nobody can say you lied.",
+      "requires": {
+        "flags_all": [
+          "leaked_evidence"
+        ],
+        "min": {
+          "ethical": 55
+        }
+      }
+    },
+    {
+      "id": "too-late",
+      "title": "Too Late to Be Believed",
+      "priority": 9,
+      "text": "The packet leaves the building, but your record says what it says. The story outlives your credibility.",
+      "requires": {
+        "flags_all": [
+          "leaked_evidence"
+        ]
+      }
+    },
+    {
+      "id": "company-analyst",
+      "title": "Company Analyst",
+      "priority": 8,
+      "text": "You signed. The promotion arrives with a new console and a view of nothing.",
+      "requires": {
+        "flags_all": [
+          "signed_cover"
+        ],
+        "min": {
+          "political": 65
+        }
+      }
+    },
+    {
+      "id": "routine-maintenance",
+      "title": "Routine Maintenance",
+      "priority": 7,
+      "text": "Archive 77-B was purged on schedule. That is what the log says, and you wrote some of it.",
+      "requires": {
+        "flags_all": [
+          "purged_77b"
+        ]
+      }
+    },
+    {
+      "id": "long-night",
+      "title": "The Long Night",
+      "priority": 6,
+      "text": "You stop deciding sometime after four. The night decides for you.",
+      "requires": {
+        "min": {
+          "fatigue": 55
+        }
+      }
+    },
+    {
+      "id": "another-night",
+      "title": "Another Night",
+      "priority": 0,
+      "text": "The shift ends. Whatever happened tonight, it is now somebody else's morning."
+    }
+  ]
+}
