@@ -35,12 +35,6 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
-    # Game Settings
-    MAX_CASES_PER_DAY: int = 10
-    CASE_DURATION_MINUTES: int = 15
-    STRESS_INCREMENT_RATE: int = 5
-    REPUTATION_INCREMENT_RATE: int = 10
-
     class Config:
         """Pydantic configuration."""
 
