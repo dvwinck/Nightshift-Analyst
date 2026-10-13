@@ -1,6 +1,6 @@
 """User manager for authentication."""
 
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 
 from fastapi import Depends, Request
@@ -13,11 +13,20 @@ from app.models.user import User
 from app.auth.database import get_user_db
 
 
+MIN_PASSWORD_LENGTH = 8
+
+
 class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
     """User manager class."""
 
     reset_password_token_secret = settings.SECRET_KEY
     verification_token_secret = settings.SECRET_KEY
+
+    async def validate_password(self, password: str, user: Union[schemas.UC, User]) -> None:
+        if len(password) < MIN_PASSWORD_LENGTH:
+            raise exceptions.InvalidPasswordException(
+                reason="Password must be at least %d characters." % MIN_PASSWORD_LENGTH
+            )
 
     async def _ensure_username_is_free(
         self, username: Optional[str], owner_id: Optional[UUID] = None

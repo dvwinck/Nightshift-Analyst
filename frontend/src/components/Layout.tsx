@@ -4,11 +4,12 @@ import { useAuth } from "../hooks/useAuth";
 
 type LayoutProps = {
   title?: string;
+  subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
 };
 
-const Layout = ({ title = "Nightshift Analyst", actions, children }: LayoutProps) => {
+const Layout = ({ title = "Nightshift Analyst", subtitle, actions, children }: LayoutProps) => {
   const { user, logout } = useAuth();
 
   return (
@@ -16,7 +17,7 @@ const Layout = ({ title = "Nightshift Analyst", actions, children }: LayoutProps
       <header className="page-header">
         <div>
           <h1 className="page-title">{title}</h1>
-          <p className="page-subtitle">Narrative investigation dashboard</p>
+          {subtitle && <p className="page-subtitle">{subtitle}</p>}
         </div>
         <div className="header-actions">
           {actions}

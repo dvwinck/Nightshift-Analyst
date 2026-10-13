@@ -23,6 +23,23 @@ export class ApiError extends Error {
   }
 }
 
+/** FastAPI sends ``detail`` as a string, or as a list of validation problems (HTTP 422). */
+export function errorMessage(payload: unknown, isJson: boolean, statusText: string): string {
+  const detail = isJson ? (payload as { detail?: unknown } | null)?.detail : undefined;
+  if (typeof detail === "string" && detail) return detail;
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const reason = (detail as { reason?: unknown }).reason;
+    if (typeof reason === "string" && reason) return reason;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" ? (item as { msg?: unknown }).msg : null))
+      .filter((msg): msg is string => typeof msg === "string");
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return statusText || "Request failed";
+}
+
 export async function request<T>(
   path: string,
   options: RequestOptions = {}
@@ -71,11 +88,7 @@ export async function request<T>(
   }
 
   if (!response.ok) {
-    const message =
-      (isJson && (payload as { detail?: string })?.detail) ||
-      response.statusText ||
-      "Request failed";
-    throw new ApiError(message, response.status, payload);
+    throw new ApiError(errorMessage(payload, isJson, response.statusText), response.status, payload);
   }
 
   return payload as T;

@@ -1,68 +1,106 @@
 import { FormEvent, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { register } from "../api/auth";
 import { ApiError } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
+
+type Mode = "login" | "register";
+
+const REGISTER_ERRORS: Record<string, string> = {
+  REGISTER_USER_ALREADY_EXISTS: "That email or username is already taken.",
+};
 
 const LoginPage = () => {
   const { login, isLoading, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const from =
     (location.state as { from?: { pathname?: string } } | undefined)?.from?.pathname ||
-    "/cases";
+    "/play";
+  const isRegister = mode === "register";
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
 
     try {
-      await login({ username, password });
+      if (isRegister) {
+        await register({ email, username, password });
+        await login({ username: email, password });
+      } else {
+        await login({ username, password });
+      }
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        setFormError(err.message);
+        setFormError(REGISTER_ERRORS[err.message] ?? err.message);
       } else {
-        setFormError("Unable to sign in. Please try again.");
+        setFormError("Something went wrong. Please try again.");
       }
     }
+  };
+
+  const switchMode = () => {
+    setMode(isRegister ? "login" : "register");
+    setFormError(null);
   };
 
   return (
     <div className="page-container login-page">
       <div className="card login-card">
-        <h1 className="page-title">Nightshift Analyst</h1>
-        <p className="page-subtitle">Log in to track narrative investigations</p>
+        <h1 className="page-title">Nightshift: Analyst</h1>
+        <p className="page-subtitle">
+          {isRegister ? "Create your analyst account" : "Clock in to your console"}
+        </p>
         <form className="form-column" onSubmit={handleSubmit}>
+          {isRegister && (
+            <label className="form-field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="analyst@nightshift.io"
+                autoComplete="email"
+                required
+              />
+            </label>
+          )}
           <label className="form-field">
-            <span>Email or Username</span>
+            <span>{isRegister ? "Username (3-50 characters)" : "Email or Username"}</span>
             <input
               type="text"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="analyst@nightshift.io"
+              placeholder={isRegister ? "analyst" : "analyst@nightshift.io"}
               autoComplete="username"
+              minLength={isRegister ? 3 : undefined}
+              maxLength={isRegister ? 50 : undefined}
               required
             />
           </label>
           <label className="form-field">
-            <span>Password</span>
+            <span>{isRegister ? "Password (at least 8 characters)" : "Password"}</span>
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
-              autoComplete="current-password"
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              minLength={isRegister ? 8 : undefined}
               required
             />
           </label>
           <button className="button" type="submit" disabled={isLoading}>
-            {isLoading ? "Signing in..." : "Sign in"}
+            {isLoading ? "Working..." : isRegister ? "Create account" : "Sign in"}
           </button>
         </form>
         {(formError || error) && (
@@ -71,7 +109,10 @@ const LoginPage = () => {
           </p>
         )}
         <p className="form-helper">
-          Need an account? Use the `/api/v1/auth/register` endpoint to create one.
+          {isRegister ? "Already have an account? " : "Need an account? "}
+          <button type="button" className="link-button" onClick={switchMode}>
+            {isRegister ? "Sign in" : "Create one"}
+          </button>
         </p>
       </div>
     </div>

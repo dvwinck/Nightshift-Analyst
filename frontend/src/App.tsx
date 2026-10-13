@@ -2,8 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
-import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import TerminalPage from "./pages/TerminalPage";
 
 const App = () => {
   const { isAuthenticated } = useAuth();
@@ -12,19 +12,19 @@ const App = () => {
     <Routes>
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to="/cases" replace /> : <LoginPage />}
+        element={isAuthenticated ? <Navigate to="/play" replace /> : <LoginPage />}
       />
       <Route
-        path="/cases"
+        path="/play"
         element={
           <ProtectedRoute>
-            <DashboardPage />
+            <TerminalPage />
           </ProtectedRoute>
         }
       />
       <Route
         path="*"
-        element={<Navigate to={isAuthenticated ? "/cases" : "/login"} replace />}
+        element={<Navigate to={isAuthenticated ? "/play" : "/login"} replace />}
       />
     </Routes>
   );

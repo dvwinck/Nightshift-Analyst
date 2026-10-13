@@ -63,3 +63,13 @@ async def test_can_keep_own_username_when_updating_profile(client, make_user):
     )
 
     assert response.status_code == 200
+
+
+async def test_short_passwords_are_rejected_with_a_readable_reason(client):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "pw@example.com", "username": "pwuser", "password": "short"},
+    )
+
+    assert response.status_code == 400
+    assert "at least 8 characters" in response.json()["detail"]["reason"]

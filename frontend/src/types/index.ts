@@ -9,41 +9,53 @@ export type User = {
   updated_at: string;
 };
 
-export type CaseStatus = "pending" | "in_progress" | "completed" | "failed";
+export type EventKind = "info" | "message" | "outcome" | "timeout" | "error" | "ending";
 
-export type CaseDifficulty = "easy" | "medium" | "hard" | "extreme";
+export type GameEvent = {
+  kind: EventKind;
+  text: string;
+  data: Record<string, unknown>;
+};
 
-export type Case = {
+export type VerbView = { verb: string; label: string };
+
+export type MessageView = {
   id: string;
-  user_id: string;
+  category: "order" | "alert" | "intel" | "chat";
+  priority: number;
+  sender: string;
   title: string;
-  description: string;
-  difficulty: CaseDifficulty;
-  status: CaseStatus;
-  time_limit_minutes: number;
-  stress_impact: number;
-  reputation_reward: number;
-  started_at: string | null;
-  completed_at: string | null;
+  read: boolean;
+  body: string | null;
+  verbs: VerbView[];
+};
+
+export type MetricsView = {
+  technical: number;
+  ethical: number;
+  political: number;
+  fatigue: number;
+};
+
+export type EndingView = { id: string; title: string; text: string };
+
+export type ShiftView = {
+  clock: number;
+  clock_label: string;
+  remaining_minutes: number;
+  metrics: MetricsView;
+  inbox: MessageView[];
+  ending: EndingView | null;
+};
+
+export type Shift = { id: string; started_at: string; view: ShiftView };
+
+export type CommandResult = { accepted: boolean; events: GameEvent[]; shift: Shift };
+
+export type LogEntry = {
+  seq: number;
+  command: string;
+  accepted: boolean;
+  events: GameEvent[];
   created_at: string;
-  updated_at: string;
-  evidence_data: string | null;
-  clues_found: number;
-  total_clues: number;
 };
-
-export type CaseCreatePayload = {
-  user_id: string;
-  title: string;
-  description: string;
-  difficulty: CaseDifficulty;
-  status?: CaseStatus;
-  time_limit_minutes?: number;
-  stress_impact?: number;
-  reputation_reward?: number;
-  evidence_data?: string | null;
-  clues_found?: number;
-  total_clues?: number;
-};
-
-export type CaseUpdatePayload = Partial<Pick<Case, "status" | "started_at" | "completed_at" | "evidence_data" | "clues_found">>;
