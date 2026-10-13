@@ -3,15 +3,20 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic_settings import BaseSettings
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+MIN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
     """Application settings."""
 
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/nightshift_analyst"
-    TEST_DATABASE_URL: str = "postgresql://user:password@localhost:5432/nightshift_analyst_test"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -19,13 +24,16 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str
     JWT_SECRET_KEY: str
-    ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Application
     APP_NAME: str = "Nightshift Analyst"
     APP_VERSION: str = "0.1.0"
-    DEBUG: bool = True
+    #: Development switch: verbose errors, and reset/verify tokens are logged (there is no email
+    #: delivery yet). Off by default so a forgotten setting is the safe one.
+    DEBUG: bool = False
+    #: Echo every SQL statement (including bound parameters) to the log.
+    SQL_ECHO: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
     # CORS
@@ -35,17 +43,19 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
-    # Game Settings
-    MAX_CASES_PER_DAY: int = 10
-    CASE_DURATION_MINUTES: int = 15
-    STRESS_INCREMENT_RATE: int = 5
-    REPUTATION_INCREMENT_RATE: int = 10
-
-    class Config:
-        """Pydantic configuration."""
-
-        env_file = ".env"
-        case_sensitive = True
+    @model_validator(mode="after")
+    def _reject_weak_secrets_outside_debug(self) -> "Settings":
+        """A copy-pasted ``.env.example`` must not reach production with publicly known keys."""
+        if self.DEBUG:
+            return self
+        for name in ("SECRET_KEY", "JWT_SECRET_KEY"):
+            value = getattr(self, name)
+            if len(value) < MIN_SECRET_LENGTH or "change-in-production" in value or value.startswith("your-"):
+                raise ValueError(
+                    "%s is a placeholder or shorter than %d characters; set a real secret "
+                    "(or DEBUG=true for local development)." % (name, MIN_SECRET_LENGTH)
+                )
+        return self
 
     @property
     def allowed_origins_list(self) -> List[str]:

@@ -1,0 +1,13 @@
+# Keep the build context small and never bake local secrets into an image layer.
+venv/
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+tests/

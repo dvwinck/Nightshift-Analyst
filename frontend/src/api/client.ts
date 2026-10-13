@@ -11,6 +11,8 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+export const NETWORK_ERROR_MESSAGE = "Cannot reach the server. Check your connection and try again.";
+
 export class ApiError extends Error {
   status: number;
   details?: unknown;
@@ -21,6 +23,23 @@ export class ApiError extends Error {
     this.status = status;
     this.details = details;
   }
+}
+
+/** FastAPI sends ``detail`` as a string, or as a list of validation problems (HTTP 422). */
+export function errorMessage(payload: unknown, isJson: boolean, statusText: string): string {
+  const detail = isJson ? (payload as { detail?: unknown } | null)?.detail : undefined;
+  if (typeof detail === "string" && detail) return detail;
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const reason = (detail as { reason?: unknown }).reason;
+    if (typeof reason === "string" && reason) return reason;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" ? (item as { msg?: unknown }).msg : null))
+      .filter((msg): msg is string => typeof msg === "string");
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return statusText || "Request failed";
 }
 
 export async function request<T>(
@@ -36,25 +55,35 @@ export async function request<T>(
 
   let requestBody: BodyInit | undefined;
 
-  if (body instanceof URLSearchParams || body instanceof FormData) {
+  if (
+    typeof body === "string" ||
+    body instanceof URLSearchParams ||
+    body instanceof FormData ||
+    body instanceof Blob
+  ) {
     requestBody = body;
   } else if (body && typeof body === "object") {
     fetchHeaders["Content-Type"] = "application/json";
     requestBody = JSON.stringify(body);
-  } else if (typeof body === "string" || body instanceof Blob) {
-    requestBody = body;
   }
 
   if (token) {
     fetchHeaders.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: fetchHeaders,
-    body: requestBody,
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: fetchHeaders,
+      body: requestBody,
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    // fetch rejects with an opaque TypeError ("Failed to fetch") when the server is unreachable.
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0, err);
+  }
 
   let payload: unknown;
 
@@ -68,11 +97,7 @@ export async function request<T>(
   }
 
   if (!response.ok) {
-    const message =
-      (isJson && (payload as { detail?: string })?.detail) ||
-      response.statusText ||
-      "Request failed";
-    throw new ApiError(message, response.status, payload);
+    throw new ApiError(errorMessage(payload, isJson, response.statusText), response.status, payload);
   }
 
   return payload as T;
