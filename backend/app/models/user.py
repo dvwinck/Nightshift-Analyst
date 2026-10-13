@@ -1,55 +1,63 @@
-"""User model."""
+"""User model.
+
+fastapi-users ships a SQLAlchemy 2.0 declarative table (``Mapped[...]`` columns) which
+cannot be mixed into a ``SQLModel`` table class. ``User`` is therefore a plain
+declarative model that shares ``SQLModel.metadata``, so the other (SQLModel) tables can
+still reference ``users.id`` in their foreign keys and ``create_all`` sees every table.
+"""
 
 from datetime import datetime
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
+from fastapi_users import schemas
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlmodel import Field, SQLModel
+from pydantic import Field
+from sqlalchemy import DateTime, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlmodel import SQLModel
+
+USERNAME_MIN_LENGTH = 3
+USERNAME_MAX_LENGTH = 50
 
 
-class UserBase(SQLModel):
-    """Base user model."""
+class Base(DeclarativeBase):
+    """Declarative base sharing SQLModel's metadata."""
 
-    email: str = Field(unique=True, index=True)
-    username: str = Field(unique=True, index=True)
-    is_active: bool = True
-    is_superuser: bool = False
-    is_verified: bool = False
+    metadata = SQLModel.metadata
 
 
-class User(UserBase, SQLAlchemyBaseUserTableUUID, table=True):
+class User(SQLAlchemyBaseUserTableUUID, Base):
     """User database model."""
 
     __tablename__ = "users"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    username: Mapped[str] = mapped_column(
+        String(USERNAME_MAX_LENGTH), unique=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
-class UserCreate(SQLModel):
-    """User creation schema."""
-
-    email: str
-    username: str
-    password: str
-
-
-class UserRead(UserBase):
+class UserRead(schemas.BaseUser[UUID]):
     """User read schema."""
 
-    id: UUID
+    username: str
     created_at: datetime
     updated_at: datetime
 
 
-class UserUpdate(SQLModel):
+class UserCreate(schemas.BaseUserCreate):
+    """User creation schema."""
+
+    username: str = Field(min_length=USERNAME_MIN_LENGTH, max_length=USERNAME_MAX_LENGTH)
+
+
+class UserUpdate(schemas.BaseUserUpdate):
     """User update schema."""
 
-    email: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
-    is_verified: Optional[bool] = None
+    username: Optional[str] = Field(
+        default=None, min_length=USERNAME_MIN_LENGTH, max_length=USERNAME_MAX_LENGTH
+    )

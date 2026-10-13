@@ -4,7 +4,9 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, UUIDIDMixin
+from fastapi_users import BaseUserManager, UUIDIDMixin, exceptions, schemas
+from loguru import logger
+from sqlalchemy import select
 
 from app.config import settings
 from app.models.user import User
@@ -17,21 +19,59 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
     reset_password_token_secret = settings.SECRET_KEY
     verification_token_secret = settings.SECRET_KEY
 
+    async def _ensure_username_is_free(
+        self, username: Optional[str], owner_id: Optional[UUID] = None
+    ) -> None:
+        """Raise ``UserAlreadyExists`` (-> HTTP 400) instead of a raw DB IntegrityError."""
+        if username is None:
+            return
+        result = await self.user_db.session.execute(
+            select(User.id).where(User.username == username)
+        )
+        existing_id = result.scalar_one_or_none()
+        if existing_id is not None and existing_id != owner_id:
+            raise exceptions.UserAlreadyExists()
+
+    async def create(
+        self,
+        user_create: schemas.UC,
+        safe: bool = False,
+        request: Optional[Request] = None,
+    ) -> User:
+        await self._ensure_username_is_free(getattr(user_create, "username", None))
+        return await super().create(user_create, safe=safe, request=request)
+
+    async def update(
+        self,
+        user_update: schemas.UU,
+        user: User,
+        safe: bool = False,
+        request: Optional[Request] = None,
+    ) -> User:
+        await self._ensure_username_is_free(
+            getattr(user_update, "username", None), owner_id=user.id
+        )
+        return await super().update(user_update, user, safe=safe, request=request)
+
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         """Called after user registration."""
-        print(f"User {user.id} has registered.")
+        logger.info("User {} registered", user.id)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
         """Called after forgot password request."""
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+        logger.info("Password reset requested for user {}", user.id)
+        if settings.DEBUG:
+            logger.debug("Password reset token for user {}: {}", user.id, token)
 
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ):
         """Called after verification request."""
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
+        logger.info("Verification requested for user {}", user.id)
+        if settings.DEBUG:
+            logger.debug("Verification token for user {}: {}", user.id, token)
 
 
 async def get_user_manager(user_db=Depends(get_user_db)):
