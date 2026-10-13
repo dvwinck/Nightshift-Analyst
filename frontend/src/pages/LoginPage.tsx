@@ -22,6 +22,9 @@ const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  // The context error (e.g. "session expired") is only relevant until the user interacts.
+  const [hideContextError, setHideContextError] = useState(false);
 
   const from =
     (location.state as { from?: { pathname?: string } } | undefined)?.from?.pathname ||
@@ -30,7 +33,10 @@ const LoginPage = () => {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     setFormError(null);
+    setHideContextError(true);
+    setSubmitting(true);
 
     try {
       if (isRegister) {
@@ -46,12 +52,15 @@ const LoginPage = () => {
       } else {
         setFormError("Something went wrong. Please try again.");
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const switchMode = () => {
     setMode(isRegister ? "login" : "register");
     setFormError(null);
+    setHideContextError(true);
   };
 
   return (
@@ -100,11 +109,11 @@ const LoginPage = () => {
               required
             />
           </label>
-          <button className="button" type="submit" disabled={isLoading}>
-            {isLoading ? "Working..." : isRegister ? "Create account" : "Sign in"}
+          <button className="button" type="submit" disabled={isLoading || submitting}>
+            {isLoading || submitting ? "Working..." : isRegister ? "Create account" : "Sign in"}
           </button>
         </form>
-        {(formError || error) && (
+        {(formError || (!hideContextError && error)) && (
           <p className="form-error" role="alert">
             {formError || error}
           </p>

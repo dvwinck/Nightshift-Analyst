@@ -15,7 +15,12 @@ const Inbox = ({ inbox, disabled, onCommand }: InboxProps) => (
         <li key={message.id} className={`inbox-item priority-${message.priority}`}>
           <div className="inbox-head">
             <span className="inbox-id">
-              {message.read ? "" : "* "}
+              {!message.read && (
+                <>
+                  <span aria-hidden="true">* </span>
+                  <span className="visually-hidden">Unread </span>
+                </>
+              )}
               {message.id}
             </span>
             <span className="inbox-priority">P{message.priority}</span>
@@ -31,6 +36,7 @@ const Inbox = ({ inbox, disabled, onCommand }: InboxProps) => (
                   type="button"
                   className="button button-secondary button-small"
                   title={label}
+                  aria-label={`${verb} ${message.id}: ${label}`}
                   disabled={disabled}
                   onClick={() => onCommand(`${verb} ${message.id}`)}
                 >
@@ -41,6 +47,7 @@ const Inbox = ({ inbox, disabled, onCommand }: InboxProps) => (
               <button
                 type="button"
                 className="button button-secondary button-small"
+                aria-label={`read ${message.id}`}
                 disabled={disabled}
                 onClick={() => onCommand(`read ${message.id}`)}
               >

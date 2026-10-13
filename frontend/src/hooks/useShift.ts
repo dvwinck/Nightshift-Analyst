@@ -36,8 +36,9 @@ export function useShift(token: string | null, onUnauthorized: () => void) {
     setLines(next);
   }, []);
 
-  const load = useCallback(async () => {
-    if (!token) return;
+  /** Fetch the current shift and replay its log. Resolves to whether the shift is now loaded. */
+  const load = useCallback(async (): Promise<boolean> => {
+    if (!token) return false;
     setStatus("loading");
     setError(null);
     try {
@@ -46,15 +47,17 @@ export function useShift(token: string | null, onUnauthorized: () => void) {
       replaceScrollback(toLines(log, 1));
       setShift(current);
       setStatus("ready");
+      return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setShift(null);
         replaceScrollback([]);
         setStatus("none");
-        return;
+        return true;
       }
       setStatus("error");
       fail(err, "Unable to load your shift.");
+      return false;
     }
   }, [token, fail, replaceScrollback]);
 
@@ -67,17 +70,23 @@ export function useShift(token: string | null, onUnauthorized: () => void) {
       await startShift(token);
       await load();
     } catch (err) {
-      fail(err, "Unable to start a shift.");
+      if (err instanceof ApiError && err.status === 409) {
+        // A shift is already running (another tab, or a double click): just show it.
+        await load();
+      } else {
+        fail(err, "Unable to start a shift.");
+      }
     } finally {
       inFlight.current = false;
       setBusy(false);
     }
   }, [token, load, fail]);
 
+  /** Send a command. Resolves to whether the server processed it (so the input can be restored). */
   const send = useCallback(
-    async (command: string) => {
+    async (command: string): Promise<boolean> => {
       const trimmed = command.trim();
-      if (!token || !trimmed || inFlight.current) return;
+      if (!token || !trimmed || inFlight.current) return false;
       inFlight.current = true;
       setBusy(true);
       setError(null);
@@ -87,15 +96,17 @@ export function useShift(token: string | null, onUnauthorized: () => void) {
         nextId.current += added.length;
         setLines((previous) => [...previous, ...added]);
         setShift(result.shift);
+        return true;
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
           inFlight.current = false;
           setBusy(false);
-          await load(); // load() clears the error, so announce the reload afterwards
-          setError("The shift changed in another window. Reloaded.");
-          return;
+          const reloaded = await load(); // load() clears the error, so announce afterwards
+          if (reloaded) setError("The shift changed in another window. Reloaded.");
+          return false;
         }
         fail(err, "Command failed. Try again.");
+        return false;
       } finally {
         inFlight.current = false;
         setBusy(false);

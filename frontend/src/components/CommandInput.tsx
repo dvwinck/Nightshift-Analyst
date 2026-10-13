@@ -6,7 +6,8 @@ import { MessageView } from "../types";
 type CommandInputProps = {
   inbox: MessageView[];
   disabled: boolean;
-  onSubmit: (command: string) => void;
+  /** Resolves to false when the command did not reach the server, so it can be typed again. */
+  onSubmit: (command: string) => Promise<boolean> | void;
 };
 
 const CommandInput = ({ inbox, disabled, onSubmit }: CommandInputProps) => {
@@ -19,20 +20,26 @@ const CommandInput = ({ inbox, disabled, onSubmit }: CommandInputProps) => {
     if (!disabled) inputRef.current?.focus();
   }, [disabled]);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const command = value.trim();
     if (!command || disabled) return;
     setHistory((previous) => [...previous, command]);
     setCursor(null);
     setValue("");
-    onSubmit(command);
+    const delivered = await onSubmit(command);
+    // Network failure or a changed shift: give the text back instead of losing it.
+    if (delivered === false) setValue((current) => current || command);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Tab") {
+      if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+      const completed = complete(value, inbox);
+      // Only swallow Tab when it completed something; otherwise let focus move on (keyboard users).
+      if (completed === value) return;
       event.preventDefault();
-      setValue((current) => complete(current, inbox));
+      setValue(completed);
     } else if (event.key === "ArrowUp" && history.length > 0) {
       event.preventDefault();
       const next = cursor === null ? history.length - 1 : Math.max(0, cursor - 1);

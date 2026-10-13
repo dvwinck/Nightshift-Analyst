@@ -39,11 +39,11 @@ textarea {
   padding: 0.65rem 0.75rem;
 }
 
-input:focus,
-select:focus,
-textarea:focus,
-button:focus {
-  outline: 2px solid rgba(99, 102, 241, 0.6);
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid #a5b4fc;
   outline-offset: 2px;
 }
 
@@ -130,59 +130,10 @@ button:focus {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
 }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
 .card-title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-}
-
-.card-subtitle {
-  margin: 0.25rem 0 0;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.card-description {
-  color: rgba(255, 255, 255, 0.75);
-  margin: 0 0 1rem;
-}
-
-.card-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  margin: 0 0 1rem;
-}
-
-.card-grid dt {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.card-grid dd {
-  margin: 0.25rem 0 0;
-  font-weight: 600;
-}
-
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.card-grid,
-.card-footer {
-  margin-top: 1.25rem;
 }
 
 .button {
@@ -194,7 +145,7 @@ button:focus {
   border-radius: 9999px;
   padding: 0.6rem 1.4rem;
   font-weight: 600;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
   transition: transform 0.12s ease, filter 0.12s ease;
 }
@@ -231,17 +182,6 @@ button:focus {
   font-size: 0.95rem;
 }
 
-.form-field-full {
-  grid-column: 1 / -1;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
 .form-error {
   margin-top: 1rem;
   color: #f87171;
@@ -266,57 +206,9 @@ button:focus {
   color: #fecaca;
 }
 
-.cases-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.card-grid {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
 .empty-state {
   color: rgba(255, 255, 255, 0.65);
   font-style: italic;
-}
-
-.status-pill {
-  border-radius: 9999px;
-  padding: 0.35rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.status-pending {
-  background: rgba(250, 204, 21, 0.18);
-  color: #facc15;
-}
-
-.status-in_progress {
-  background: rgba(96, 165, 250, 0.18);
-  color: #60a5fa;
-}
-
-.status-completed {
-  background: rgba(74, 222, 128, 0.18);
-  color: #4ade80;
-}
-
-.status-failed {
-  background: rgba(248, 113, 113, 0.18);
-  color: #f87171;
 }
 
 /* ---- Terminal ---- */
@@ -532,4 +424,21 @@ button:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

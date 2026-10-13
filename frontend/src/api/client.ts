@@ -11,6 +11,8 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+export const NETWORK_ERROR_MESSAGE = "Cannot reach the server. Check your connection and try again.";
+
 export class ApiError extends Error {
   status: number;
   details?: unknown;
@@ -69,12 +71,19 @@ export async function request<T>(
     fetchHeaders.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: fetchHeaders,
-    body: requestBody,
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: fetchHeaders,
+      body: requestBody,
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    // fetch rejects with an opaque TypeError ("Failed to fetch") when the server is unreachable.
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0, err);
+  }
 
   let payload: unknown;
 

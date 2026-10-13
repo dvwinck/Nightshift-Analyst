@@ -7,10 +7,15 @@ import Layout from "../components/Layout";
 import { useAuth } from "../hooks/useAuth";
 import { useShift } from "../hooks/useShift";
 
+/** Keep following new output only while the player has not scrolled up to read. */
+const NEAR_BOTTOM_PX = 48;
+
 const TerminalPage = () => {
-  const { token, logout } = useAuth();
-  const { shift, lines, status, busy, error, load, start, send } = useShift(token, logout);
+  const { token, expireSession } = useAuth();
+  const { shift, lines, status, busy, error, load, start, send } = useShift(token, expireSession);
   const outputRef = useRef<HTMLDivElement>(null);
+  const followOutput = useRef(true);
+  const newShiftRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     load();
@@ -18,10 +23,22 @@ const TerminalPage = () => {
 
   useEffect(() => {
     const output = outputRef.current;
-    if (output) output.scrollTop = output.scrollHeight;
+    if (output && followOutput.current) output.scrollTop = output.scrollHeight;
   }, [lines]);
 
   const ended = shift?.view.ending ?? null;
+
+  useEffect(() => {
+    // The input unmounts when the shift ends; send keyboard focus somewhere useful.
+    if (ended) newShiftRef.current?.focus();
+  }, [ended]);
+
+  const trackScroll = () => {
+    const output = outputRef.current;
+    if (!output) return;
+    followOutput.current =
+      output.scrollHeight - output.scrollTop - output.clientHeight <= NEAR_BOTTOM_PX;
+  };
 
   return (
     <Layout subtitle="Night shift console">
@@ -52,7 +69,13 @@ const TerminalPage = () => {
       {status === "ready" && shift && (
         <div className="terminal-layout">
           <section className="terminal" aria-label="Terminal">
-            <div className="terminal-output" ref={outputRef} role="log" aria-live="polite">
+            <div
+              className="terminal-output"
+              ref={outputRef}
+              onScroll={trackScroll}
+              role="log"
+              aria-label="Console output"
+            >
               {lines.map((line) => (
                 <p key={line.id} className={`line line-${line.kind}`}>
                   {line.text}
@@ -62,7 +85,13 @@ const TerminalPage = () => {
             {ended ? (
               <div className="ending-banner">
                 <strong>{ended.title}</strong>
-                <button type="button" className="button" onClick={start} disabled={busy}>
+                <button
+                  type="button"
+                  className="button"
+                  ref={newShiftRef}
+                  onClick={start}
+                  disabled={busy}
+                >
                   Start new shift
                 </button>
               </div>

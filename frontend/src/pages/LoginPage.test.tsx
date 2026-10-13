@@ -24,6 +24,7 @@ const renderPage = (error: string | null = null) =>
           error,
           login,
           logout: vi.fn(),
+          expireSession: vi.fn(),
           refreshUser: vi.fn(),
         }}
       >
@@ -77,6 +78,33 @@ describe("LoginPage", () => {
       password: "long-enough-pw",
     });
     expect(login).toHaveBeenCalledWith({ username: "new@nightshift.dev", password: "long-enough-pw" });
+  });
+
+  it("stops showing a stale context error once the user switches to registration", async () => {
+    renderPage("Your session expired. Please sign in again.");
+    expect(screen.getByRole("alert")).toHaveTextContent("session expired");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create one" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("ignores a second submit while registration is in progress", async () => {
+    let finish: (value: never) => void = () => undefined;
+    vi.mocked(authApi.register).mockReturnValue(new Promise((resolve) => (finish = resolve as never)));
+    login.mockResolvedValue(undefined);
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Create one" }));
+    await userEvent.type(screen.getByLabelText("Email"), "new@nightshift.dev");
+    await userEvent.type(screen.getByLabelText(/Username/), "newbie");
+    await userEvent.type(screen.getByLabelText(/Password/), "long-enough-pw");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+    await userEvent.click(screen.getByRole("button", { name: "Working..." }));
+    finish({} as never);
+
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
+    expect(authApi.register).toHaveBeenCalledTimes(1);
   });
 
   it("shows the session-expired message handed over by the auth context", () => {

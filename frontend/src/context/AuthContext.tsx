@@ -23,6 +23,8 @@ type AuthContextValue = {
   error: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
+  /** Sign out because the server rejected the token, and say so on the login page. */
+  expireSession: () => void;
   refreshUser: () => Promise<void>;
 };
 
@@ -63,13 +65,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const profile = await fetchCurrentUser(authToken);
         persistSession(authToken, profile);
       } catch (err) {
-        clearSession();
-        if (err instanceof ApiError && err.status === 401) {
+        const rejected = err instanceof ApiError && (err.status === 401 || err.status === 403);
+        if (rejected) {
+          clearSession();
           setError("Your session expired. Please sign in again.");
-        } else if (err instanceof ApiError) {
-          setError(err.message);
         } else {
-          setError("Unable to refresh user session");
+          // Offline or a server hiccup says nothing about the token: keep the session.
+          setError(err instanceof ApiError ? err.message : "Unable to refresh user session");
         }
       }
     },
@@ -131,6 +133,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     clearSession();
   }, [clearSession]);
 
+  const expireSession = useCallback(() => {
+    clearSession();
+    setError("Your session expired. Please sign in again.");
+  }, [clearSession]);
+
   const refreshUser = useCallback(async () => {
     if (!token) {
       return;
@@ -153,9 +160,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       error,
       login,
       logout,
+      expireSession,
       refreshUser,
     }),
-    [error, isLoading, login, logout, refreshUser, token, user]
+    [error, expireSession, isLoading, login, logout, refreshUser, token, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

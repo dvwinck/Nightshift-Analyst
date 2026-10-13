@@ -17,6 +17,6 @@ export async function sendCommand(token: string, command: string): Promise<Comma
   });
 }
 
-export async function getLog(token: string, limit = 200): Promise<LogEntry[]> {
+export async function getLog(token: string, limit = 500): Promise<LogEntry[]> {
   return request<LogEntry[]>(`/shifts/current/log?limit=${limit}`, { token });
 }

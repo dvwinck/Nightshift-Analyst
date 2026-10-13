@@ -15,10 +15,22 @@ describe("toLines", () => {
     ]);
   });
 
-  it("does not echo the internal start entry", () => {
-    const lines = toLines([{ command: "start", events: [{ kind: "info", text: "NIGHTSHIFT", data: {} }] }], 1);
+  it("does not echo the internal start entry (seq 0)", () => {
+    const lines = toLines(
+      [{ seq: 0, command: "start", events: [{ kind: "info", text: "NIGHTSHIFT", data: {} }] }],
+      1
+    );
 
     expect(lines).toEqual([{ id: 1, kind: "info", text: "NIGHTSHIFT" }]);
+  });
+
+  it("still echoes a player who literally typed 'start'", () => {
+    const lines = toLines(
+      [{ seq: 4, command: "start", events: [{ kind: "error", text: "Unknown command", data: {} }] }],
+      1
+    );
+
+    expect(lines[0]).toEqual({ id: 1, kind: "command", text: "> start" });
   });
 
   it("assigns strictly increasing ids across entries", () => {
