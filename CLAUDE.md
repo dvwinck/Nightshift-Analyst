@@ -52,6 +52,23 @@ npm run build      # tsc -b && vite build — also the only type-check
 - **Config is safe by default.** `DEBUG` defaults to false; with it off the app refuses placeholder/short (<32) secrets. `DEBUG=true` (local only) also logs reset tokens. SQL logging is a separate `SQL_ECHO`.
 - **Content edits vs. running shifts.** A shift stores only `content_name`. Views and `inbox` tolerate a removed message id, but renaming ids or changing flags still skews shifts in progress: treat published content as append-only, or add a new `<name>` file.
 - **No rate limiting and no log retention.** Every accepted or rejected command writes an `action_logs` row until the shift ends (a finished shift writes nothing), and a player can start shifts in a loop. An abandoned shift stays active until it is played out.
-- Tests default to SQLite; PostgreSQL-only behaviour is covered by running the suite with `TEST_DATABASE_URL`. There is no CI yet. `ruff check app tests` is clean; `black --check` and `mypy` still report issues on older code.
+- Tests default to SQLite; PostgreSQL-only behaviour is covered by running the suite with `TEST_DATABASE_URL`. CI (`.github/workflows/ci.yml`) runs `ruff check app tests` and `pytest` on Python 3.9, and `npm run build` + `npm test` for the frontend; those gate merges. `black --check`, `isort --check` and `mypy app` still report issues on older code, so CI runs them as advisory only (config in `backend/pyproject.toml`).
 - Redis and Celery are configured but unused by the game. The GDD's SSE stream, observability and LLM layer are not built; the GDD names SvelteKit and the client is React (decision deferred, see the roadmap).
 - Python 3.9 syntax only (`Optional[X]`, not `X | None`), matching the Dockerfile.
+
+## Working rules
+
+Apply these on every change, in addition to the architecture above. User instruction in the conversation overrides this file.
+
+1. **Verify, don't invent.** Read the source of truth before using an endpoint, field, command name, content flag or signature: `engine/models.py` for schemas, `backend/content/*.json` for content, `src/api/*.ts` and `routes/*.py` for the API contract, the GDD in `DGD/` for design intent. If something could not be verified, say exactly what.
+2. **Stay in scope.** Change only what the task needs, plus required collateral (call sites, types, fixtures, tests for the changed behavior). No refactors for taste, renames of working code, drive-by fixes, dependency bumps or whole-file reformatting. Note anything found on the side in the PR description instead of fixing it.
+3. **Decide, then declare.** Cheap-to-reverse choices (names, layout, implementation details): decide and record the assumption. Ask first when the requirement is ambiguous in a way that changes the solution, or the decision is expensive to reverse: DB schema, public API contract, published content ids/flags, a new dependency, infra. Put all blocking questions in one message, with a recommendation each.
+4. **Simplest thing that fits.** Follow existing patterns. No abstraction, flag or config layer for a hypothetical future case.
+5. **Behavior change needs a test**, in the same PR, in the existing style: rules in `tests/engine/`, API in `tests/test_*_api.py`, UI next to the component as `*.test.tsx`. If a test is impractical, say why and how it was verified by hand. After editing `backend/content/`, run `pytest tests/engine/test_content.py`.
+6. **Errors and logs.** Never swallow an exception (no bare `except: pass`, no empty `catch {}`; ruff `BLE` is enforced). Log with enough context to diagnose (operation, shift/user id, failing field) and never log raw payloads, command text from players, passwords, tokens or auth headers: log field names and the error, not the values. No `print()` in `app/` (ruff `T20`).
+7. **Never commit secrets.** `.env` stays untracked; only `.env.example` with placeholders. Do not weaken the config guard that rejects placeholder or short secrets when `DEBUG` is off.
+8. **Verify before saying it is done.** Run the commands in "Commands": `ruff check app tests` and `pytest` in `backend/`, `npm run build` and `npm test` in `frontend/`. Report what failed rather than "should work".
+9. **Uncertainty comes with options.** If unsure, state the doubt and the options considered with the trade-off of each; no generic "please review carefully".
+10. **Git.** One branch per feature or fix, one logical change per PR, nothing straight to `main` (it is protected: PR + passing `backend` and `frontend` checks). Use the PR template.
+
+When finishing a code change, end with: **Changed**, **Tested** (commands and results), **Assumptions**, **Findings** (out of scope). Omit empty sections.
