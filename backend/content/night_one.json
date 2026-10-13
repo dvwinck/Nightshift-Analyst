@@ -1,6 +1,6 @@
 {
   "title": "Night One",
-  "intro": "NIGHTSHIFT v0.1 // ANALYST CONSOLE\nShift 22:00-06:00. Type 'help' for commands. Type 'inbox' to see what is waiting.",
+  "intro": "NIGHTSHIFT v0.1 // ANALYST CONSOLE\nShift 22:00-06:00. Type 'help' for commands, 'inbox' to see what is waiting.\nMessages expire: 'inbox' shows when. You cannot clock out before 02:00.",
   "start_hour": 22,
   "shift_length_minutes": 480,
   "start": {
@@ -101,7 +101,8 @@
             "minutes": 5,
             "set_flags": [
               "knows_77b"
-            ]
+            ],
+            "political": -2
           }
         }
       }
@@ -112,11 +113,11 @@
       "priority": 5,
       "sender": "UNKNOWN",
       "title": "Misdirected: addressed to the Director",
-      "body": "TO: DIRECTOR (a name identical to yours). 'The night analyst has read access to 77-B. Revoke it before the purge completes.' A routing error placed this in your queue.",
+      "body": "TO: DIRECTOR (a name identical to yours). 'The night analyst has read access to 77-B. Revoke it.' A routing error placed this in your queue.",
       "arrives_at": 20,
       "expires_at": 240,
       "on_timeout": {
-        "text": "The message ages out of your queue. You never decided what you saw.",
+        "text": "The message ages out of your queue. Whatever you decided about it, you decided by default.",
         "effects": {
           "ethical": -3
         }
@@ -131,7 +132,8 @@
             "minutes": 8,
             "set_flags": [
               "knows_conspiracy"
-            ]
+            ],
+            "political": -2
           }
         },
         "execute": {
@@ -147,10 +149,10 @@
         },
         "deny": {
           "label": "Delete it",
-          "text": "Deleted. You tell yourself it never arrived.",
+          "text": "Deleted. The audit trail will remember you tried.",
           "effects": {
             "ethical": -6,
-            "political": 2,
+            "political": -2,
             "set_flags": [
               "deleted_intel"
             ]
@@ -160,7 +162,9 @@
           "label": "Sit on it",
           "text": "You hold it. It burns.",
           "effects": {
-            "fatigue": 2
+            "fatigue": 2,
+            "ethical": -3,
+            "political": -3
           }
         }
       }
@@ -390,10 +394,11 @@
         },
         "delay": {
           "label": "Request edits",
-          "text": "You ask for edits. Nobody answers.",
+          "text": "You ask for edits. Nobody refuses, and nobody answers.",
           "effects": {
-            "political": -3,
-            "fatigue": 2
+            "political": 2,
+            "fatigue": 2,
+            "ethical": 2
           }
         }
       }
@@ -551,6 +556,113 @@
             ]
           }
         }
+      },
+      "requires": {
+        "flags_none": [
+          "leaked_evidence"
+        ]
+      }
+    },
+    {
+      "id": "order-777",
+      "category": "order",
+      "priority": 5,
+      "sender": "SECURITY",
+      "title": "Escort to the exit at 05:00",
+      "body": "Your access has been revoked. Hand over your badge at the exit. Do not return to your console.",
+      "arrives_at": 300,
+      "expires_at": 440,
+      "requires": {
+        "flags_all": [
+          "leaked_evidence"
+        ]
+      },
+      "on_timeout": {
+        "text": "Nobody comes. The building simply stops knowing your name.",
+        "effects": {
+          "political": -4
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Hand over the badge",
+          "text": "The guard takes it without looking at you.",
+          "effects": {
+            "political": -5,
+            "ethical": 3,
+            "set_flags": [
+              "badge_surrendered"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Refuse to leave",
+          "text": "You stay at your desk until they carry the argument for you.",
+          "effects": {
+            "political": -12,
+            "ethical": 6,
+            "set_flags": [
+              "refused_escort"
+            ]
+          }
+        },
+        "investigate": {
+          "label": "Record the escort",
+          "text": "You record the escort. For once the footage is yours.",
+          "effects": {
+            "technical": 6,
+            "fatigue": 3,
+            "minutes": 8,
+            "set_flags": [
+              "recorded_escort"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "order-778",
+      "category": "order",
+      "priority": 4,
+      "sender": "SUPERVISOR",
+      "title": "You kept the log",
+      "body": "You withheld the audit log. We will discuss that. Send it now, or explain yourself in writing.",
+      "arrives_at": 140,
+      "expires_at": 320,
+      "requires": {
+        "flags_all": [
+          "withheld_logs"
+        ]
+      },
+      "on_timeout": {
+        "text": "The Supervisor stops asking and starts writing.",
+        "effects": {
+          "political": -6
+        }
+      },
+      "responses": {
+        "execute": {
+          "label": "Apologize and send it",
+          "text": "Sent, late. The Supervisor files the apology and the log in the same folder.",
+          "effects": {
+            "political": 8,
+            "ethical": -6,
+            "set_flags": [
+              "logs_late"
+            ]
+          }
+        },
+        "deny": {
+          "label": "Stand by it",
+          "text": "You put your refusal in writing. It reads better than you feel.",
+          "effects": {
+            "political": -8,
+            "ethical": 6,
+            "set_flags": [
+              "stood_firm"
+            ]
+          }
+        }
       }
     }
   ],
@@ -563,6 +675,10 @@
       "requires": {
         "flags_all": [
           "leaked_evidence"
+        ],
+        "flags_none": [
+          "purged_77b",
+          "deleted_intel"
         ],
         "min": {
           "ethical": 55
@@ -589,8 +705,12 @@
         "flags_all": [
           "signed_cover"
         ],
+        "flags_none": [
+          "declined_promotion"
+        ],
         "min": {
-          "political": 65
+          "political": 65,
+          "technical": 55
         }
       }
     },
@@ -609,7 +729,7 @@
       "id": "long-night",
       "title": "The Long Night",
       "priority": 6,
-      "text": "You stop deciding sometime after four. The night decides for you.",
+      "text": "You are still at the console when the sun comes up, and you cannot say what you decided.",
       "requires": {
         "min": {
           "fatigue": 55
@@ -622,5 +742,6 @@
       "priority": 0,
       "text": "The shift ends. Whatever happened tonight, it is now somebody else's morning."
     }
-  ]
+  ],
+  "earliest_clockout_minutes": 240
 }

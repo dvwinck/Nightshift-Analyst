@@ -8,6 +8,7 @@ this function, and stores the result.
 from typing import List, Optional, Tuple
 
 from app.engine.models import (
+    EXPIRY_GRACE_MINUTES,
     NON_RESOLVING,
     QUALITIES,
     VERB_MINUTES,
@@ -78,22 +79,31 @@ def apply_command(
         return state, [_error("Type a command. Try 'help'.")], False
     verb, args = words[0], words[1:]
 
-    if verb in FREE_COMMANDS:
-        return state, _free_command(verb, state, content), True
+    if verb in FREE_COMMANDS or verb == "clockout":
+        if args:
+            return state, [_error("Usage: %s" % verb)], False
+        if verb in FREE_COMMANDS:
+            return state, _free_command(verb, state, content), True
+        if new.clock < content.earliest_clockout_minutes:
+            return (
+                state,
+                [_error("You cannot clock out before %s." % format_clock(content, content.earliest_clockout_minutes))],
+                False,
+            )
+        events = [Event(kind="info", text="You clock out.")]
+        _finish(new, content, events)
+        return new, events, True
     if verb == "wait":
         minutes = DEFAULT_WAIT_MINUTES
         if args:
-            if len(args) != 1 or not args[0].isdigit():
+            # isdecimal() alone also accepts digits like '²' that int() rejects; require ASCII.
+            if len(args) != 1 or not (args[0].isascii() and args[0].isdecimal()) or len(args[0]) > 4:
                 return state, [_error("Usage: wait [minutes]")], False
             minutes = int(args[0])
         if not 1 <= minutes <= MAX_WAIT_MINUTES:
             return state, [_error("You can wait 1-%d minutes at a time." % MAX_WAIT_MINUTES)], False
         events = [Event(kind="info", text="You watch the console for %d minutes." % minutes)]
         _advance(new, minutes, content, events)
-        return new, events, True
-    if verb == "clockout":
-        events = [Event(kind="info", text="You clock out early.")]
-        _finish(new, content, events)
         return new, events, True
     if verb == "read" or verb in RESPONSE_VERBS:
         if len(args) != 1:
@@ -123,7 +133,7 @@ def _free_command(verb: str, state: ShiftState, content: ShiftContent) -> List[E
             "execute|deny <id>    decide a message you have read",
             "delay|investigate <id>   once per message; keeps it open",
             "wait [minutes]       let time pass (default 15, max 60)",
-            "clockout             end the shift now",
+            "clockout             end the shift (not before the early hours)",
         ]
         return [Event(kind="info", text="\n".join(lines))]
     if verb == "status":
@@ -141,10 +151,29 @@ def _free_command(verb: str, state: ShiftState, content: ShiftContent) -> List[E
     lines = []
     for message_id in open_ids:
         message = content.message(message_id)
-        assert message is not None
+        if message is None:  # content changed under a running shift; ignore what no longer exists
+            continue
         mark = " " if message_id in state.read else "*"
-        lines.append("%s %s  P%d  %s: %s" % (mark, message.id, message.priority, message.sender, message.title))
-    return [Event(kind="info", text="\n".join(lines))]
+        due = deadline(state, message)
+        due_text = "" if due is None else "  (due %s)" % format_clock(content, due)
+        lines.append(
+            "%s %s  P%d  %s: %s%s" % (mark, message.id, message.priority, message.sender, message.title, due_text)
+        )
+    return [Event(kind="info", text="\n".join(lines) or "Inbox empty.")]
+
+
+def deadline(state: ShiftState, message: Message) -> Optional[int]:
+    """Clock minute at which an unanswered message expires, or ``None`` if it never does.
+
+    The authored ``expires_at`` is extended so the player always gets ``EXPIRY_GRACE_MINUTES``
+    from the moment the message was actually delivered.
+    """
+    if message.expires_at is None:
+        return None
+    delivered = state.announced_at.get(message.id)
+    if delivered is None:
+        return message.expires_at
+    return max(message.expires_at, delivered + EXPIRY_GRACE_MINUTES)
 
 
 def open_messages(state: ShiftState) -> List[str]:
@@ -252,11 +281,12 @@ def _settle(state: ShiftState, content: ShiftContent, events: List[Event]) -> No
 
 
 def _expire(state: ShiftState, message: Message, events: List[Event]) -> bool:
+    due = deadline(state, message)
     if (
-        message.expires_at is None
+        due is None
         or message.id not in state.announced
         or message.id in state.resolved
-        or message.expires_at > state.clock
+        or due > state.clock
     ):
         return False
     state.resolved[message.id] = "timeout"
@@ -283,6 +313,7 @@ def _deliver(state: ShiftState, message: Message, events: List[Event]) -> bool:
     ):
         return False
     state.announced.append(message.id)
+    state.announced_at[message.id] = state.clock
     events.append(
         Event(
             kind="message",
@@ -295,7 +326,9 @@ def _deliver(state: ShiftState, message: Message, events: List[Event]) -> bool:
 
 def _finish(state: ShiftState, content: ShiftContent, events: List[Event]) -> None:
     ordered = sorted(content.endings, key=lambda e: -e.priority)  # stable: ties keep file order
-    chosen = next(e for e in ordered if holds(e.requires, state))
+    # validate_content guarantees a catch-all; fall back to the last ending rather than crash if
+    # a content file bypassed validation.
+    chosen = next((e for e in ordered if holds(e.requires, state)), ordered[-1])
     state.ending = chosen.id
     events.append(
         Event(kind="ending", text="%s\n\n%s" % (chosen.title, chosen.text), data={"id": chosen.id})

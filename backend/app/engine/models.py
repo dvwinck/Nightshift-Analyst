@@ -20,6 +20,10 @@ QUALITIES = ("technical", "ethical", "political", "fatigue")
 #: once per message, after which the message stays open for a real decision.
 NON_RESOLVING = ("delay", "investigate")
 
+#: A message is never taken away sooner than this many minutes after it was delivered, so a
+#: message that arrives late (gated by a flag or metric) can always be read and answered.
+EXPIRY_GRACE_MINUTES = 30
+
 #: Minutes of shift time each verb costs before the outcome's own ``minutes`` is added.
 VERB_MINUTES = {"read": 2, "execute": 5, "deny": 3, "delay": 1, "investigate": 10}
 
@@ -106,9 +110,9 @@ class Ending(_Strict):
 
 
 class StartingMetrics(_Strict):
-    technical: int = 50
-    ethical: int = 50
-    political: int = 50
+    technical: int = Field(default=50, ge=0, le=100)
+    ethical: int = Field(default=50, ge=0, le=100)
+    political: int = Field(default=50, ge=0, le=100)
 
 
 class ShiftContent(_Strict):
@@ -116,6 +120,8 @@ class ShiftContent(_Strict):
     intro: str
     start_hour: int = Field(default=22, ge=0, le=23)
     shift_length_minutes: int = Field(default=480, gt=0)
+    #: ``clockout`` is refused before this many minutes into the shift (0 = always allowed).
+    earliest_clockout_minutes: int = Field(default=0, ge=0)
     start: StartingMetrics = Field(default_factory=StartingMetrics)
     messages: List[Message]
     endings: List[Ending]
@@ -136,6 +142,8 @@ class ShiftState(BaseModel):
     political: int = 50
     fatigue: int = 0
     announced: List[str] = Field(default_factory=list)
+    #: Message id -> clock minute at which it was delivered (drives the expiry grace period).
+    announced_at: Dict[str, int] = Field(default_factory=dict)
     read: List[str] = Field(default_factory=list)
     #: ``"verb:message-id"`` pairs for the non-resolving verbs already used.
     tried: List[str] = Field(default_factory=list)
