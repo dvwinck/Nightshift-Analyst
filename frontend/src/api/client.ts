@@ -36,13 +36,16 @@ export async function request<T>(
 
   let requestBody: BodyInit | undefined;
 
-  if (body instanceof URLSearchParams || body instanceof FormData) {
+  if (
+    typeof body === "string" ||
+    body instanceof URLSearchParams ||
+    body instanceof FormData ||
+    body instanceof Blob
+  ) {
     requestBody = body;
   } else if (body && typeof body === "object") {
     fetchHeaders["Content-Type"] = "application/json";
     requestBody = JSON.stringify(body);
-  } else if (typeof body === "string" || body instanceof Blob) {
-    requestBody = body;
   }
 
   if (token) {
