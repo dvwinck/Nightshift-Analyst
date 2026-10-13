@@ -1,5 +1,5 @@
 # Use Python 3.9 slim image
-FROM python:3.9-slim
+FROM python:3.14-slim
 
 # Set working directory
 WORKDIR /app
