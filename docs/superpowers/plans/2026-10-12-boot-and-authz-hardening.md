@@ -1,5 +1,14 @@
 # Boot & Authorization Hardening Implementation Plan
 
+> **STATUS (read this first): partly superseded.** Decision D1 was resolved in favour of the GDD, so the
+> detective domain (cases / characters / game state) was **removed** instead of hardened.
+> **Done as written:** Task 1 (boot fix + harness), Task 2 (auth hardening) and Task 6 steps 1-6 (frontend build fix).
+> **Deliberately not done:** Tasks 3, 4, 5 and Task 6 steps 7-9, Task 7's merge step: their subject no longer exists.
+> The work lives on branch `feat/shift-engine`, not `fix/boot-and-authz-hardening`. The server-authority
+> principles of Tasks 3-5 were applied to the new `/shifts` API instead (see the roadmap).
+> Later reviews added to Task 2's scope: password >= 8 and <= 128 chars, safe-charset case-insensitive usernames,
+> and `pydantic==2.13.5` is pinned in `requirements.txt`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the backend actually start, give it a real test suite, close every cross-user access and client-writable-outcome hole found in the analysis, and make the frontend build and match the new API.

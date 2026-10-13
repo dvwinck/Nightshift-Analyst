@@ -1,72 +1,88 @@
 # Nightshift Analyst — Improvement Roadmap
 
-> Umbrella document. Each numbered plan below is a separate, independently shippable plan.
-> **Plan 1 is fully detailed** in `2026-10-12-boot-and-authz-hardening.md`. Plans 2–6 are outlines
-> that must be expanded (with `superpowers:writing-plans`) only after their dependencies land,
-> and Plans 3–5 only after decision **D1**.
+> Umbrella document and **status board**. Updated after the first implementation round and an independent
+> review by five reviewers (security, engine correctness, game design, frontend/a11y, architecture/ops).
 
-## 1. What the analysis found (all verified by running code, not only reading it)
+## 1. Decision D1 — RESOLVED: the GDD wins
 
-| # | Finding | Evidence |
+The code used to implement a detective-case game while the GDD describes a night-shift analyst terminal game
+(messages, orders, three metrics, consequences). The GDD was chosen: the detective domain
+(`Case`, `Character`, `Decision`, `GameState` and their routes/UI) was removed and replaced by the **shift**
+model (engine + API + terminal UI). React was kept for now; React-vs-SvelteKit is still open and cheap to revisit
+while the client is small. Revisit before Plan 5 grows the UI.
+
+## 2. What was found at the start (all verified by running code)
+
+| # | Finding | Status |
 |---|---|---|
-| F1 | **The backend does not start.** `User(UserBase, SQLAlchemyBaseUserTableUUID, table=True)` mixes SQLModel with fastapi-users' SQLAlchemy 2.0 `Mapped[...]` table. | `import app.models.user` → `PydanticSchemaGenerationError: Unable to generate pydantic-core schema for sqlalchemy.orm.base.Mapped[str]`. Reproduced with pydantic 2.13.5 **and** 2.10.6 (not version drift). |
-| F2 | `npm run build` fails on a clean checkout. | `tsconfig.node.json` is `composite` + `noEmit` (TS6310), has no `lib`/`target` (108 TS errors from `Set`/`Symbol`), plus a real narrowing error at `src/api/client.ts:44`. |
-| F3 | No object-level authorization on characters; `CharacterRead` exposes `is_guilty`. | Any logged-in user can read/edit/delete any character and read the solution. |
-| F4 | The client chooses ownership and outcomes. | `user_id`/`case_id` come from the request body; `PATCH /game-state/me` and `PATCH /cases/{id}` accept `reputation`, `cases_solved`, `status`, `clues_found`. |
-| F5 | Registering an existing username raises an unhandled `IntegrityError` (500). Over-long usernames pass on SQLite but break on Postgres (`String(50)`). | Probe tests. |
-| F6 | Reset/verification tokens are `print()`ed to stdout. Swagger `tokenUrl` points to a non-existent route. | `app/auth/manager.py`, `app/auth/backend.py`. |
-| F7 | README/GDD mention Alembic and `pytest`; neither exists. Lint baseline is not green (ruff 4 errors, black 6 files, mypy 14 errors). | `ruff check`, `black --check`, `mypy` on the original code. |
-| F8 | **The code and the GDD describe different games.** | See D1. |
+| F1 | The backend did not start (`User` mixed SQLModel with fastapi-users' SQLAlchemy 2.0 table) | **Fixed** (declarative `User` on shared metadata) |
+| F2 | `npm run build` failed on a clean checkout | **Fixed** |
+| F3–F4 | No object-level authorization on characters; client chose ownership/outcomes | **Moot**: the domain was removed; the new API only takes a command string and resolves the shift through the token |
+| F5 | Duplicate username → 500; over-long usernames | **Fixed** (+ safe charset, case-insensitive uniqueness, password 8–128) |
+| F6 | Tokens printed to stdout; wrong Swagger `tokenUrl` | **Fixed** |
+| F7 | README/GDD promised Alembic and tests that did not exist; lint baseline not green | Tests **done**, `ruff` **clean** on `app`/`tests`; Alembic, `black` and `mypy` **open** (Plan 6) |
+| F8 | Code and GDD described different games | **Resolved** (D1) |
 
-## 2. Decision D1 — which game are we building? (blocks Plans 3–5, not Plans 1–2)
+## 3. Plan status
 
-| | GDD (`DGD/…pdf`) | Current code |
+| Plan | Goal | Status |
 |---|---|---|
-| Premise | Night-shift analyst, classified agency, a conspiracy; terminal UI | Detective investigating cases, suspects, witnesses |
-| Entities | Player, Message, Order, Event, Session, ActionLog | Case, Character, Decision, GameState |
-| Metrics | Technical / Ethical / Political | Stress / Reputation |
-| Loop | Receive → Interpret → Act → React → Reflect | CRUD over cases |
-| Frontend | SvelteKit + Tailwind/DaisyUI | React 18 + Vite |
-| Realtime | SSE/WebSocket (`/api/stream`, `/api/commands`) | REST only |
+| 1. Boot & authorization hardening | App boots, tests exist, auth safe | **Done** for tasks 1, 2, 6 (3–5 dropped, see banner in its file) |
+| 2. Rules engine & content | Pure engine, validated content, reachability tests | **Done** (`app/engine`, `content/night_one.json`) |
+| 3. Persistence & API | `Shift`/`ActionLog`, command endpoint, optimistic concurrency | **Done** (`/api/v1/shifts…`, not `/commands` as first sketched) |
+| 4. Terminal UI | Playable client | **Done** (React terminal, HUD, inbox, history, completion) |
+| 5. Review round | Independent review, fixes | **Done**: see §4 |
+| 6. Foundations | Alembic baseline, CI (GitHub Actions), pre-commit, green ruff/black/mypy | **Open** |
+| 7. Live feed & operations | SSE message feed, rate limiting, log retention, Sentry/OTel | **Open** |
+| 8. Content & design depth | More shifts, endings that read the whole record, hidden/uncertain information | **Open** (see §5) |
+| 9. Browser end-to-end tests | Playwright: register → play → ending | **Open** |
 
-**Recommendation (owner's call):** treat the GDD as the source of truth for *concept and mechanics*
-(the README already calls it "authoritative"), keep FastAPI/Postgres/Redis/Celery as-is, and defer
-React-vs-Svelte to Plan 5 — the frontend is ~15 small files, so the switch is cheap *now* and costly later.
-The detective `Case/Character/Decision` models then become either (a) reused as the content model for
-"investigation" events, or (b) retired. **Plan 1 is deliberately safe under either answer.**
+## 4. Review round: what changed
 
-## 3. Sequence
+Verified findings that were fixed (each has a regression test; most were first proven by a failing probe):
 
-| Plan | Goal | Depends on | Exit criteria |
-|---|---|---|---|
-| **1. Boot & authorization hardening** (detailed) | App boots; tests exist; no cross-user access; client cannot write outcomes; frontend builds | — | `pytest` green (23 tests), `npm run build` green |
-| **2. Foundations** | Alembic baseline; tests also run on real Postgres; CI (GitHub Actions); pre-commit; make ruff/black/mypy green; pin `pydantic`; `docker-compose` smoke | 1 | CI green on PR; `alembic upgrade head` on empty DB; `alembic revision --autogenerate` yields no diff |
-| **3. Rules engine & commands** | Pure `apply_command(state, command) -> (state, events)`; `POST /commands`; `ActionLog`; metrics with bounds | 1, **D1** | Engine unit tests need no DB; every state change goes through a command; illegal commands rejected + logged |
-| **4. Narrative content & realtime** | Storylet/QBN content as validated JSON; condition/effect evaluation; SSE feed | 3 | A scripted playthrough test reaches ≥2 distinct endings; SSE delivers events in order |
-| **5. Frontend** | Terminal UI on the new API; TanStack Query; ESLint + Vitest + Playwright happy path | 3 (4 for the feed), D1 | Playwright: login → read message → issue command → see consequence |
-| **6. Operations (optional)** | Sentry/OpenTelemetry, `fastapi-limiter`, optional LiteLLM adversary messages (Pydantic-validated) | 2 | Rate limit returns 429; traces visible locally |
+- **Engine totality:** `wait ²` raised `ValueError` (unicode digit) → 500 with a traceback. Fixed; the engine is fuzzed with 6000 hostile inputs.
+- **Phantom penalty:** a gated message could arrive and expire in the same command, charging a penalty for something the player never saw (~6 % of random night-one runs). Fixed with a 30-minute grace from delivery.
+- **Finished shifts kept writing** (`ended_at` rewritten, version bumped, a log row per command). Now a no-op.
+- **Config unsafe by default:** `DEBUG` defaulted to true (tracebacks, tokens in logs, SQL with parameters echoed). Now false, SQL echo separate, and placeholder/short secrets are refused when `DEBUG` is off.
+- **Concurrent startup crashed on PostgreSQL** (3 of 4 workers: `UniqueViolation`). Fixed with an advisory lock; found by running the suite on a real PostgreSQL.
+- Input hygiene: control characters and lone surrogates in commands are a 422 (validation errors no longer echo the input); `POST /shifts` works with and without the trailing slash.
+- Frontend: Tab no longer traps keyboard users; offline/5xx no longer logs you out; expired sessions say so; typed command restored on network failure; contrast, focus ring, ARIA for meters/inbox, dead CSS removed.
+- Game-design contradictions fixed (declined promotion still ending as Company Analyst; promotion offered to someone who just leaked; "before the purge completes" after the purge), the `clockout` exploit closed (not before 02:00), deadlines shown in `inbox`.
+- Infra: `.dockerignore` (a local `.env`/`venv` was being baked into the image), non-root container, ports bound to localhost, dev/runtime requirements split, FK `ON DELETE CASCADE`.
+- Test quality: mutation testing of the engine (the critic found 17 surviving mutants; I re-ran those classes plus the new grace rule: 18 mutants, all killed) and of the frontend guards.
 
-## 4. Design principles to hold every plan to
+Reviewer findings **not** acted on, and why:
 
-1. **Server authoritative.** Clients send *intent* ("execute order-773"), never *results* ("reputation = 100").
-   References: [AccelByte — server-authoritative logic](https://accelbyte.io/blog/server-authoritative-logic-to-prevent-cheating),
-   [Bugnet — validate player actions server-side](https://bugnet.io/blog/how-to-validate-player-actions-server-side).
-2. **Object- and property-level authorization on every route** (OWASP API Security Top 10, 2023: API1 BOLA, API3 BOPLA).
-   References: [ISACA review of the 2023 list](https://www.isaca.org/resources/news-and-trends/industry-news/2023/reviewing-the-2023-owasp-api-top-10),
-   [Barracuda — BOPLA](https://blog.barracuda.com/2023/05/23/owasp-top-10-api-broken-object-property-level-authorization).
-3. **Rules as pure functions, I/O at the edge** (Command, State, Event Queue — *Game Programming Patterns*):
-   [contents](https://gameprogrammingpatterns.com/contents.html).
-4. **Content as data** — quality-based narrative / storylets: metrics are *qualities* that gate content.
-   References: [Failbetter, "Adventures in Text" (GDC Vault)](https://gdcvault.com/play/1021775/Adventures-in-Text-Innovating-in),
-   [TinyQBN terms and concepts](https://videlais.com/tag/qbn/page/2/).
-5. **Design to the target feeling (MDA).** The GDD's target aesthetic is *the weight of a decision*; mechanics must give
-   choices cost, incomplete information and delayed consequence, not only ±numbers.
-   Reference: [Hunicke, LeBlanc, Zubek — MDA](https://users.cs.northwestern.edu/~hunicke/MDA.pdf).
+| Finding | Decision |
+|---|---|
+| Rate limiting / `action_logs` retention / shift-start loop | Plan 7; needs a product decision on limits |
+| Account enumeration through register | Accepted fastapi-users trade-off; revisit with email verification |
+| `Shift.state` is an untyped JSON blob without `schema_version`; content has no version | Documented in CLAUDE.md; address with Alembic (Plan 6) |
+| Command list duplicated (engine help, `completion.ts`, README) | Cheap now; extract a shared list when a third client appears |
+| Outcome delta lines turn morality into a scoreboard | Kept: the GDD itself shows `Obedience +5 \| Conscience -10`; revisit in Plan 8 |
+| `datetime.utcnow` deprecated on Python 3.12 | Matches the Python 3.9 target; change with the runtime |
+| Terminal output unbounded in memory | A shift is finite (~hundreds of lines) |
 
-## 5. Known limits of this analysis
+## 5. Design backlog from the playtest (Plan 8)
 
-- Tests in Plan 1 run on in-memory SQLite. Postgres-specific behaviour (length limits, FK enforcement,
-  `UNIQUE` races) is only covered once Plan 2 adds a Postgres test job.
-- Nothing was run against Docker/Postgres/Redis/Celery; the Celery worker and `docker-compose` were read, not executed.
-- Plan 1's code was validated in a scratch copy (Python 3.9.6 venv, requirements installed unpinned for transitive
-  packages, pydantic 2.13.5), not in the repository.
+Measured on the engine (4000 random runs, strategy bots): Ethical and Political are strongly anti-correlated (a slider, not a triangle);
+Technical gates only one ending; time pressure is weak (65–88 % of the shift is `wait`); 14 of 20 flags were dead before this round.
+Applied now: endings read more of the record, reactive messages (`order-777`, `order-778`), a price for `investigate`
+and for indecision, visible deadlines. Still open: make Technical matter beyond one ending, an uncertainty mechanic
+(unreliable messages), more shifts, use the player's real name in the premise message, and decide whether the ethical/political
+numbers should be hidden from the HUD to preserve moral ambiguity.
+
+## 6. Principles every plan keeps
+
+1. **Server authoritative:** clients send intent, never results ([AccelByte](https://accelbyte.io/blog/server-authoritative-logic-to-prevent-cheating), [Bugnet](https://bugnet.io/blog/how-to-validate-player-actions-server-side)).
+2. **Object- and property-level authorization on every route** (OWASP API Top 10 2023: [ISACA](https://www.isaca.org/resources/news-and-trends/industry-news/2023/reviewing-the-2023-owasp-api-top-10)).
+3. **Rules as pure functions, I/O at the edge** ([Game Programming Patterns](https://gameprogrammingpatterns.com/contents.html)).
+4. **Content as data**, quality-based narrative / storylets ([Failbetter, GDC](https://gdcvault.com/play/1021775/Adventures-in-Text-Innovating-in)).
+5. **Design to the target feeling** (MDA, [Hunicke et al.](https://users.cs.northwestern.edu/~hunicke/MDA.pdf)): "feel the weight of a decision".
+
+## 7. Known limits of this verification
+
+- The backend suite passes on in-memory SQLite and, run by hand with `TEST_DATABASE_URL`, on a real PostgreSQL (an embedded build, not the `postgres:15-alpine` image).
+- Docker was never started: `docker-compose.yml` was validated with `docker compose config` only; the image was not built or run.
+- Celery and Redis were never exercised. No CI exists yet. The UI was played by hand in one browser session and by Vitest; there is no Playwright test.

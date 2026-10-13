@@ -7,6 +7,7 @@ export const message = (overrides: Partial<MessageView> = {}): MessageView => ({
   sender: "DIRECTORATE",
   title: "Purge archive 77-B before 03:00",
   read: false,
+  due: null,
   body: null,
   verbs: [],
   ...overrides,

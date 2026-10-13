@@ -15,10 +15,11 @@ Nightshift: Analyst is a narrative terminal game: a night-shift analyst reads me
 Backend (run from `backend/`; `cp .env.example .env` first — `SECRET_KEY` and `JWT_SECRET_KEY` have no defaults, so the app will not import without them):
 
 ```bash
-python -m venv venv && source venv/bin/activate && pip install -r requirements.txt   # Python 3.9 (Dockerfile)
+python -m venv venv && source venv/bin/activate && pip install -r requirements-dev.txt   # Python 3.9 (Dockerfile); requirements.txt is the runtime set
 docker-compose up --build            # postgres, redis, backend (:8000, --reload), celery_worker
 uvicorn app.main:app --reload        # local; DATABASE_URL may also be sqlite+aiosqlite:///./dev.db (no Docker)
 pytest                               # SQLite in memory, no services; one test: pytest tests/test_shifts_api.py::test_name
+TEST_DATABASE_URL=postgresql+asyncpg://… pytest   # same suite on real PostgreSQL (drops/recreates its tables!)
 pytest tests/engine                  # the rules engine only (fast, no DB)
 ```
 
@@ -37,9 +38,9 @@ npm run build      # tsc -b && vite build — also the only type-check
 
 **Server authority.** The client sends a command string and nothing else; it can never send state, ownership or outcomes. Responses go through `engine/view.py`, which never exposes unread message bodies, effects, requirements or flags. A shift is always found through the authenticated user (`get_current_shift`), so there is no object id to forge. Keep it that way for any new route.
 
-**Content is data.** A shift is `backend/content/<name>.json`, parsed into `ShiftContent` (`engine/models.py`, unknown keys are rejected) and checked by `engine/content.validate_content` (duplicate ids, missing catch-all ending, flags required but never set, late arrivals). `tests/engine/test_content.py` also plays thousands of seeded random shifts and fails if an ending becomes unreachable or an invariant (metrics 0–100, clock monotonic) breaks — run it after editing content. The clock only advances through commands (`read` 2 min, `execute` 5, `deny` 3, `delay` 1, `investigate` 10, `wait n`), and fatigue accrues 5 per hour. `delay` and `investigate` are non-resolving: once per message, the message stays open.
+**Content is data.** A shift is `backend/content/<name>.json`, parsed into `ShiftContent` (`engine/models.py`, unknown keys and duplicate JSON keys are rejected) and checked by `engine/content.validate_content` (duplicate ids, missing or shadowing catch-all ending, flags used but never set, messages or endings whose flags cannot be produced, unresolvable messages). `tests/engine/test_content.py` also plays thousands of seeded random shifts and fails if an ending becomes unreachable or an invariant breaks, plus scripted playthroughs for specific endings — run it after editing content. The clock only advances through commands (`read` 2 min, `execute` 5, `deny` 3, `delay` 1, `investigate` 10, `wait n` 1–60); fatigue accrues 5 per hour. `delay` and `investigate` are non-resolving: once per message, the message stays open. A message expires at `expires_at`, but never sooner than 30 minutes after it was actually delivered (`rules.deadline`), so a gated message cannot arrive already expired; `inbox` and the API show the deadline. `clockout` is refused before `earliest_clockout_minutes` (02:00 in night_one).
 
-**Persistence.** `Shift.state` is a serialized `ShiftState` (JSON column). A partial unique index allows one unfinished shift per user. Tables are created by `init_db()` (`SQLModel.metadata.create_all`) at startup. `User` is a plain SQLAlchemy declarative model sharing `SQLModel.metadata` (fastapi-users cannot be mixed into a SQLModel table), so `ForeignKey("users.id")` still works.
+**Persistence.** `Shift.state` is a serialized `ShiftState` (JSON column). A partial unique index allows one unfinished shift per user. Tables are created by `init_db()` (`SQLModel.metadata.create_all`) at startup, serialised across workers with a PostgreSQL advisory lock (without it 3 of 4 simultaneous workers crash). Deleting a user cascades to their shifts and logs. `User` is a plain SQLAlchemy declarative model sharing `SQLModel.metadata` (fastapi-users cannot be mixed into a SQLModel table), so `ForeignKey("users.id")` still works.
 
 **Auth.** Routes are assembled in `routes/auth.py`. Login is `POST /auth/jwt/login`, form-encoded, and the `username` field is the **email**. Register is `/auth/register` (username 3–50 chars, password ≥ 8, duplicate username → 400). The frontend keeps the token in `localStorage` (`AuthContext`) and revalidates it through `/auth/users/me`; all HTTP goes through `request()` in `src/api/client.ts`.
 
@@ -48,9 +49,9 @@ npm run build      # tsc -b && vite build — also the only type-check
 ## Gotchas / known gaps
 
 - **No Alembic yet.** The schema comes from `create_all`, which does not alter existing tables: after changing a model, reset the dev database.
-- **Content edits vs. running shifts.** A shift stores only `content_name`. Removing or renaming a message id in a content file breaks shifts that are in progress. Treat published content as append-only, or create a new `<name>` file.
-- Tests run on SQLite. Postgres-only behaviour (length limits, FK enforcement, unique races) is untested.
-- Lint baseline is not green (`ruff`, `black --check`, `mypy` all report issues on existing code); there is no CI yet.
-- Redis and Celery are configured but unused by the game; `celery_app.py` only has a `health_check` task. The GDD's SSE stream, rate limiting, observability and LLM layer are not built.
-- The GDD names SvelteKit; the client is React (decision deferred, see the roadmap).
+- **Config is safe by default.** `DEBUG` defaults to false; with it off the app refuses placeholder/short (<32) secrets. `DEBUG=true` (local only) also logs reset tokens. SQL logging is a separate `SQL_ECHO`.
+- **Content edits vs. running shifts.** A shift stores only `content_name`. Views and `inbox` tolerate a removed message id, but renaming ids or changing flags still skews shifts in progress: treat published content as append-only, or add a new `<name>` file.
+- **No rate limiting and no log retention.** Every accepted or rejected command writes an `action_logs` row until the shift ends (a finished shift writes nothing), and a player can start shifts in a loop. An abandoned shift stays active until it is played out.
+- Tests default to SQLite; PostgreSQL-only behaviour is covered by running the suite with `TEST_DATABASE_URL`. There is no CI yet. `ruff check app tests` is clean; `black --check` and `mypy` still report issues on older code.
+- Redis and Celery are configured but unused by the game. The GDD's SSE stream, observability and LLM layer are not built; the GDD names SvelteKit and the client is React (decision deferred, see the roadmap).
 - Python 3.9 syntax only (`Optional[X]`, not `X | None`), matching the Dockerfile.

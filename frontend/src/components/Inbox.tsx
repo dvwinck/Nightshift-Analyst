@@ -23,7 +23,10 @@ const Inbox = ({ inbox, disabled, onCommand }: InboxProps) => (
               )}
               {message.id}
             </span>
-            <span className="inbox-priority">P{message.priority}</span>
+            <span className="inbox-priority">
+              P{message.priority}
+              {message.due && <span className="inbox-due"> · due {message.due}</span>}
+            </span>
           </div>
           <div className="inbox-title">
             {message.sender}: {message.title}

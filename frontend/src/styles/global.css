@@ -442,3 +442,7 @@ button:focus-visible {
     animation: none !important;
   }
 }
+
+.inbox-due {
+  color: #fbbf24;
+}

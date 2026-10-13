@@ -1,6 +1,6 @@
 # Nightshift Analyst
 
-Nightshift: Analyst is a narrative terminal game about power, surveillance and moral choice: you are a night-shift analyst, messages arrive, every decision shifts three metrics (technical, ethical, political), and the shift ends in one of several endings. You play in a browser terminal.
+Nightshift: Analyst is a narrative terminal game about power, surveillance and moral choice: you are a night-shift analyst, messages arrive, every decision shifts three metrics (technical, ethical, political) while fatigue builds, and the shift ends in one of several endings. You play in a browser terminal.
 
 ## Project Structure
 

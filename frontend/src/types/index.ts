@@ -26,6 +26,8 @@ export type MessageView = {
   sender: string;
   title: string;
   read: boolean;
+  /** Wall-clock time (e.g. "00:30") after which the message expires, if it ever does. */
+  due: string | null;
   body: string | null;
   verbs: VerbView[];
 };
