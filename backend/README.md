@@ -1,13 +1,13 @@
 # Nightshift Analyst - Backend API
 
-FastAPI backend for the Nightshift Analyst detective game.
+FastAPI backend for Nightshift: Analyst, a narrative terminal game. The game rules are a pure engine (`app/engine/`); the API only loads a shift, runs one command and stores the result.
 
 ## Features
 
 - **Authentication**: JWT-based authentication with FastAPI Users
 - **Database**: PostgreSQL with SQLModel/SQLAlchemy ORM
 - **Async Support**: Fully asynchronous API using asyncio and asyncpg
-- **Caching**: Redis for session management and caching
+- **Redis / Celery**: configured for future use (live events, background jobs); the game does not use them yet
 - **Background Tasks**: Celery for async task processing
 - **API Documentation**: Auto-generated OpenAPI/Swagger docs
 - **Type Safety**: Full type hints with Pydantic models
@@ -40,70 +40,34 @@ backend/
 
 ### Prerequisites
 
-- Python 3.9+
-- PostgreSQL 15+
-- Redis 7+
-- Docker & Docker Compose (optional)
+- Python 3.9+ (the Dockerfile uses 3.9)
+- PostgreSQL 15+ for real use. For a quick local run you can instead set `DATABASE_URL=sqlite+aiosqlite:///./dev.db`
+- Docker & Docker Compose (optional; starts PostgreSQL, Redis, the API and a Celery worker)
+
+Redis is not required to play: nothing in the game reads it yet.
 
 ### Local Development
 
-1. **Clone the repository and navigate to backend directory:**
-
 ```bash
 cd backend
-```
-
-2. **Create a virtual environment:**
-
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. **Install dependencies:**
-
-```bash
-pip install -r requirements.txt
-```
-
-4. **Set up environment variables:**
-
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-5. **Start PostgreSQL and Redis** (if not using Docker)
-
-6. **Run database migrations:**
-
-```bash
-alembic upgrade head
-```
-
-7. **Start the development server:**
-
-```bash
+python -m venv venv && source venv/bin/activate
+pip install -r requirements-dev.txt     # requirements.txt is the runtime set only
+cp .env.example .env                    # DEBUG=true and placeholder secrets: local use only
 uvicorn app.main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `http://localhost:8000`. Tables are created on startup
+(`create_all`); there are no Alembic migrations yet, so after changing a model reset your dev database.
 
 ### Docker Development
 
-1. **Build and start all services:**
-
 ```bash
+cp .env.example .env
 docker-compose up --build
 ```
 
-2. **Run migrations inside the container:**
-
-```bash
-docker-compose exec backend alembic upgrade head
-```
-
-The API will be available at `http://localhost:8000`
+Ports are bound to `127.0.0.1` only. The compose file runs the API with `--reload`; the image's own
+command does not. The API will be available at `http://localhost:8000`.
 
 ## API Documentation
 
@@ -132,31 +96,32 @@ outcome is computed on the server.
 
 - `POST /api/v1/shifts/` - Start a shift (409 while one is in progress)
 - `GET /api/v1/shifts/current` - Latest shift: clock, metrics and inbox (unread bodies are never sent)
-- `POST /api/v1/shifts/current/commands` - Body `{"command": "read order-773"}`. A rejected command answers 200 with `accepted: false`
+- `POST /api/v1/shifts/current/commands` - Body `{"command": "read order-773"}` (1-200 characters, no control characters, else 422). A rejected command answers 200 with `accepted: false`; 404 if no shift was started; 409 if another request changed the shift first (retry); a finished shift answers `accepted: false` and writes nothing
 - `GET /api/v1/shifts/current/log?limit=100` - Replay of the last commands, oldest first
 
-Commands: `help`, `status`, `inbox`, `read <id>`, `execute|deny <id>`, `delay <id>` and `investigate <id>`
-(once per message, the message stays open), `wait [minutes]`, `clockout`.
+Commands: `help`, `status`, `inbox` (shows when each message expires), `read <id>` (2 min), `execute|deny <id>`
+(5 / 3 min), `delay <id>` (1 min) and `investigate <id>` (10 min; both once per message, the message stays open),
+`wait [minutes]` (default 15, max 60), `clockout` (refused before 02:00). Fatigue rises 5 per hour of shift time.
+A message is never taken away sooner than 30 minutes after it was delivered.
 
 ## Environment Variables
 
-Key environment variables (see `.env.example` for complete list):
+See `.env.example` for the complete list. The important ones:
 
 ```bash
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/nightshift_analyst
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# Security
-SECRET_KEY=your-secret-key-here
-JWT_SECRET_KEY=your-jwt-secret-key-here
-
-# Application
-DEBUG=True
+DATABASE_URL=postgresql://user:password@localhost:5432/nightshift_analyst   # or sqlite+aiosqlite:///./dev.db
+SECRET_KEY=...        # 32+ characters
+JWT_SECRET_KEY=...    # 32+ characters
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+DEBUG=false           # true only for local development
+SQL_ECHO=false        # log every SQL statement (with parameters)
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
+
+With `DEBUG=false` (the default) the app **refuses to start** if a secret is a placeholder
+(`your-...`, `...change-in-production`) or shorter than 32 characters. With `DEBUG=true` verbose errors
+are on and password-reset/verification tokens are written to the log (there is no email delivery yet);
+never enable it in production.
 
 ## Database Models
 
@@ -166,18 +131,20 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 
 ## Testing
 
-Run tests with pytest (no database or Redis needed; it uses in-memory SQLite):
+Run tests with pytest (by default no services are needed: it uses in-memory SQLite):
 
 ```bash
 pytest
 pytest tests/engine   # rules engine only
 ```
 
-Run tests with coverage:
+Run the same suite against a real PostgreSQL (also enables the concurrent schema-creation test):
 
 ```bash
-pytest --cov=app
+TEST_DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/nightshift_test pytest
 ```
+
+The tests drop and recreate every table in that database, so point it at a scratch database.
 
 ## Code Quality
 
@@ -207,18 +174,13 @@ mypy app/
 
 ## Production Deployment
 
-1. Set `DEBUG=False` in environment variables
-2. Use a production-grade ASGI server (e.g., gunicorn with uvicorn workers)
-3. Set up proper SSL/TLS certificates
-4. Configure database connection pooling
-5. Set up monitoring and logging
-6. Use environment-specific secrets
-
-Example production command:
-
-```bash
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-```
+1. Set `DEBUG=false` and real 32+ character `SECRET_KEY` / `JWT_SECRET_KEY` (startup fails otherwise)
+2. Run several workers: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4`
+   (schema creation is serialised with a PostgreSQL advisory lock, so workers can start together)
+3. Terminate TLS in front of the app and set `ALLOWED_ORIGINS` to your real frontend origin
+4. Do not publish PostgreSQL or Redis to the internet (the compose file binds them to localhost)
+5. Known gaps before real traffic: no rate limiting, no retention policy for `action_logs`,
+   no Alembic migrations (see `docs/superpowers/plans/2026-10-12-improvement-roadmap.md`)
 
 ## License
 

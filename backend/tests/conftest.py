@@ -4,15 +4,15 @@ import os
 from itertools import count
 from typing import Awaitable, Callable, Dict
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
-os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key")
+os.environ.setdefault("SECRET_KEY", "pytest-only-secret-key-0123456789abcdef")
+os.environ.setdefault("JWT_SECRET_KEY", "pytest-only-jwt-secret-0123456789abcdef")
 
 import httpx
 import pytest_asyncio
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 from sqlmodel import SQLModel
 
 import app.models  # noqa: F401  (registers every table on SQLModel.metadata)
@@ -24,14 +24,23 @@ Headers = Dict[str, str]
 MakeUser = Callable[..., Awaitable[Headers]]
 
 
+#: Point this at a real PostgreSQL (``postgresql+asyncpg://...``) to run the whole suite against it.
+#: Without it the tests use an in-memory SQLite database and need no services.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+
+
 @pytest_asyncio.fixture
 async def session_maker():
-    engine = create_async_engine(
-        "sqlite+aiosqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    if TEST_DATABASE_URL:
+        engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    else:
+        engine = create_async_engine(
+            "sqlite+aiosqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
     async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
     yield sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     await engine.dispose()

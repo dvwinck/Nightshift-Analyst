@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin, exceptions, schemas
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.config import settings
 from app.models.user import User
@@ -35,10 +35,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
         if username is None:
             return
         result = await self.user_db.session.execute(
-            select(User.id).where(User.username == username)
+            select(User.id).where(func.lower(User.username) == username.lower())
         )
-        existing_id = result.scalar_one_or_none()
-        if existing_id is not None and existing_id != owner_id:
+        existing_ids = result.scalars().all()
+        if any(existing_id != owner_id for existing_id in existing_ids):
             raise exceptions.UserAlreadyExists()
 
     async def create(

@@ -20,6 +20,15 @@ async def _cmd(client, headers, command):
     return response.json()
 
 
+async def _finish(client, headers):
+    """Let the whole night pass (clocking out is not allowed before 02:00)."""
+    for _ in range(9):
+        result = await _cmd(client, headers, "wait 60")
+        if result["shift"]["view"]["ending"]:
+            return result
+    raise AssertionError("shift did not end")
+
+
 @pytest.mark.parametrize(
     "method,path",
     [
@@ -52,6 +61,7 @@ async def test_starting_a_shift_returns_a_sanitized_view_and_the_intro_in_the_lo
     view = shift["view"]
     assert view["clock_label"] == "22:00" and view["ending"] is None
     assert {m["id"] for m in view["inbox"]} == {"alert-101", "order-773"}
+    assert {m["id"]: m["due"] for m in view["inbox"]} == {"alert-101": "00:00", "order-773": "03:00"}
     assert all(m["read"] is False and m["body"] is None and m["verbs"] == [] for m in view["inbox"])
     for secret in ("effects", "requires", "set_flags", "on_timeout", "purged_77b"):
         assert secret not in str(shift)
@@ -66,7 +76,7 @@ async def test_cannot_start_a_second_shift_until_the_first_ends(client, make_use
 
     assert (await client.post(SHIFTS + "/", headers=alice)).status_code == 409
 
-    await _cmd(client, alice, "clockout")
+    await _finish(client, alice)
     second = await _start(client, alice)
     assert second["id"] != first["id"]
     assert (await client.get(SHIFTS + "/current", headers=alice)).json()["id"] == second["id"]
@@ -136,7 +146,7 @@ async def test_players_cannot_see_or_affect_each_others_shifts(client, make_user
 
     assert (await client.get(SHIFTS + "/current", headers=bob)).status_code == 404
     await _start(client, bob)
-    await _cmd(client, bob, "clockout")
+    await _finish(client, bob)
 
     alice_view = (await client.get(SHIFTS + "/current", headers=alice)).json()["view"]
     assert alice_view["ending"] is None and alice_view["clock"] == 0
@@ -216,3 +226,78 @@ async def test_database_itself_allows_only_one_unfinished_shift_per_user(client,
 
         with pytest.raises(IntegrityError):
             await session.commit()
+
+
+async def test_both_url_spellings_start_a_shift_without_a_redirect(client, make_user):
+    alice = await make_user()
+    bob = await make_user()
+
+    with_slash = await client.post(SHIFTS + "/", headers=alice)
+    without_slash = await client.post(SHIFTS, headers=bob)
+
+    assert with_slash.status_code == 201
+    assert without_slash.status_code == 201  # not a 307 to the slash variant
+
+
+async def test_clocking_out_early_is_refused_and_the_shift_goes_on(client, make_user):
+    alice = await make_user()
+    await _start(client, alice)
+
+    result = await _cmd(client, alice, "clockout")
+
+    assert result["accepted"] is False and "02:00" in result["events"][0]["text"]
+    assert result["shift"]["view"]["ending"] is None
+
+
+async def test_a_finished_shift_writes_nothing_more(client, make_user, session_maker):
+    alice = await make_user()
+    await _start(client, alice)
+    await _finish(client, alice)
+    async with session_maker() as session:
+        shift = (await session.execute(select(Shift))).scalar_one()
+        ended_at, version = shift.ended_at, shift.version
+    log_before = len((await client.get(SHIFTS + "/current/log?limit=500", headers=alice)).json())
+
+    for command in ("status", "wait 5", "dance", "read order-773"):
+        result = await _cmd(client, alice, command)
+        assert result["accepted"] is False and "over" in result["events"][0]["text"]
+
+    async with session_maker() as session:
+        shift = (await session.execute(select(Shift))).scalar_one()
+        assert (shift.ended_at, shift.version) == (ended_at, version)
+    log_after = len((await client.get(SHIFTS + "/current/log?limit=500", headers=alice)).json())
+    assert log_after == log_before
+
+
+@pytest.mark.parametrize("command", ["wait 5\x00", "read\x07 order-773", "status\n", "\x7f"])
+async def test_control_characters_are_rejected_before_they_reach_the_engine(client, make_user, command):
+    alice = await make_user()
+    await _start(client, alice)
+
+    response = await client.post(SHIFTS + "/current/commands", json={"command": command}, headers=alice)
+
+    assert response.status_code == 422
+    assert "control characters" in response.text
+    assert command not in response.text  # the input is not echoed back
+
+
+async def test_a_lone_surrogate_in_the_json_body_is_a_422_not_a_server_error(client, make_user):
+    alice = await make_user()
+    await _start(client, alice)
+
+    response = await client.post(
+        SHIFTS + "/current/commands",
+        content=b'{"command": "wait \\ud800"}',
+        headers={**alice, "content-type": "application/json"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_unicode_digits_in_wait_are_a_rejected_command_not_a_crash(client, make_user):
+    alice = await make_user()
+    await _start(client, alice)
+
+    result = await _cmd(client, alice, "wait \u00b2")
+
+    assert result["accepted"] is False and "Usage" in result["events"][0]["text"]

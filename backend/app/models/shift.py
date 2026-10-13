@@ -24,7 +24,7 @@ class Shift(SQLModel, table=True):
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: UUID = Field(foreign_key="users.id", index=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
     content_name: str = "night_one"
     state: Dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
     #: Bumped on every command; the compare-and-set that stops two requests clobbering each other.
@@ -40,7 +40,7 @@ class ActionLog(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("shift_id", "seq", name="uq_action_logs_shift_seq"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    shift_id: UUID = Field(foreign_key="shifts.id", index=True)
+    shift_id: UUID = Field(foreign_key="shifts.id", index=True, ondelete="CASCADE")
     seq: int
     command: str
     accepted: bool

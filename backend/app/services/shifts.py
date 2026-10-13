@@ -5,7 +5,7 @@ shift lives here.
 """
 
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -87,6 +87,11 @@ async def run_command(
     The state write is a compare-and-set on ``version``: if a concurrent request won, this one
     raises ``StaleShift`` (HTTP 409) rather than silently overwriting it.
     """
+    if shift.ended_at is not None:
+        # Nothing can change once the shift is over, so do not write (or log) anything either:
+        # otherwise a finished shift is an unbounded log-growth and ``ended_at``-rewrite vector.
+        return shift, [Event(kind="error", text="The shift is over.")], False
+
     content = content_for(shift)
     new_state, events, accepted = apply_command(state_of(shift), raw, content)
     next_version = shift.version + 1

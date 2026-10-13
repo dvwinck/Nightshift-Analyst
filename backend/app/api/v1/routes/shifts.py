@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.users import current_active_user
@@ -24,6 +24,14 @@ router = APIRouter()
 
 class CommandRequest(BaseModel):
     command: str = Field(min_length=1, max_length=200)
+
+    @field_validator("command")
+    @classmethod
+    def _no_control_characters(cls, value: str) -> str:
+        # NUL and friends are never a command, and PostgreSQL refuses NUL in text columns.
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("Commands cannot contain control characters.")
+        return value
 
 
 class ShiftResponse(BaseModel):
@@ -58,6 +66,7 @@ async def _current_or_404(session: AsyncSession, user: User) -> Shift:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No shift yet. Start one first.")
 
 
+@router.post("", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED)
 async def start_shift(
     session: AsyncSession = Depends(get_session),

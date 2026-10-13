@@ -1,3 +1,6 @@
+import pytest
+
+
 async def test_register_login_and_me(client, make_user):
     headers = await make_user()
 
@@ -73,3 +76,59 @@ async def test_short_passwords_are_rejected_with_a_readable_reason(client):
 
     assert response.status_code == 400
     assert "at least 8 characters" in response.json()["detail"]["reason"]
+
+
+async def test_usernames_are_unique_regardless_of_case(client, make_user):
+    await make_user()  # user1
+
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "case@example.com", "username": "USER1", "password": "correct-horse-battery"},
+    )
+
+    assert response.status_code == 400
+
+
+async def test_the_database_enforces_case_insensitive_usernames_too(client, make_user, session_maker):
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.user import User
+
+    await make_user()  # user1
+    async with session_maker() as session:
+        session.add(User(email="db@example.com", username="User1", hashed_password="x"))
+        with pytest.raises(IntegrityError):
+            await session.commit()
+
+
+@pytest.mark.parametrize(
+    "username",
+    ["  user9  ", "user\u200b9", "<img src=x>", "has space", "semi;colon", "ünïcode"],
+)
+async def test_usernames_are_limited_to_a_safe_charset(client, username):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "safe@example.com", "username": username, "password": "correct-horse-battery"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_enormous_passwords_are_rejected(client):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "big@example.com", "username": "bigpw", "password": "x" * 129},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_validation_errors_do_not_echo_the_input_back(client):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "echo@example.com", "username": "<b>secret-marker</b>", "password": "correct-horse-battery"},
+    )
+
+    assert response.status_code == 422
+    assert "secret-marker" not in response.text
+    assert response.json()["detail"][0]["loc"][-1] == "username"
