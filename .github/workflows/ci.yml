@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9" # same as backend/Dockerfile
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: cp .env.example .env # SECRET_KEY / JWT_SECRET_KEY have no defaults
+      - name: Lint (ruff)
+        run: ruff check app tests
+      - name: Tests (SQLite in memory, no services)
+        run: pytest
+      # Known debt: these fail on code that predates this workflow. Visible, not blocking.
+      # Make them blocking (drop continue-on-error) once the debt is paid.
+      - name: Style and types (advisory)
+        continue-on-error: true
+        run: |
+          black --check app tests
+          isort --check app tests
+          mypy app
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type-check and build
+        run: npm run build # tsc -b && vite build; the only type-check
+      - name: Tests
+        run: npm test
