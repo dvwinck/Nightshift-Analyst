@@ -7,8 +7,9 @@ import { useAuth } from "../hooks/useAuth";
 
 type Mode = "login" | "register";
 
-const REGISTER_ERRORS: Record<string, string> = {
+const API_ERRORS: Record<string, string> = {
   REGISTER_USER_ALREADY_EXISTS: "That email or username is already taken.",
+  LOGIN_BAD_CREDENTIALS: "Wrong email or password.",
 };
 
 const LoginPage = () => {
@@ -36,12 +37,12 @@ const LoginPage = () => {
         await register({ email, username, password });
         await login({ username: email, password });
       } else {
-        await login({ username, password });
+        await login({ username: email, password });
       }
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        setFormError(REGISTER_ERRORS[err.message] ?? err.message);
+        setFormError(API_ERRORS[err.message] ?? err.message);
       } else {
         setFormError("Something went wrong. Please try again.");
       }
@@ -61,32 +62,32 @@ const LoginPage = () => {
           {isRegister ? "Create your analyst account" : "Clock in to your console"}
         </p>
         <form className="form-column" onSubmit={handleSubmit}>
+          <label className="form-field">
+            <span>Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="analyst@nightshift.io"
+              autoComplete={isRegister ? "email" : "username"}
+              required
+            />
+          </label>
           {isRegister && (
             <label className="form-field">
-              <span>Email</span>
+              <span>Username (3-50 characters)</span>
               <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="analyst@nightshift.io"
-                autoComplete="email"
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="analyst"
+                autoComplete="nickname"
+                minLength={3}
+                maxLength={50}
                 required
               />
             </label>
           )}
-          <label className="form-field">
-            <span>{isRegister ? "Username (3-50 characters)" : "Email or Username"}</span>
-            <input
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder={isRegister ? "analyst" : "analyst@nightshift.io"}
-              autoComplete="username"
-              minLength={isRegister ? 3 : undefined}
-              maxLength={isRegister ? 50 : undefined}
-              required
-            />
-          </label>
           <label className="form-field">
             <span>{isRegister ? "Password (at least 8 characters)" : "Password"}</span>
             <input

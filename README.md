@@ -1,11 +1,12 @@
 # Nightshift Analyst
 
-Detective-themed narrative game that blends investigation mechanics with narrative branching. The repository currently focuses on the backend API that powers the experience and includes the core game design document for reference.
+Nightshift: Analyst is a narrative terminal game about power, surveillance and moral choice: you are a night-shift analyst, messages arrive, every decision shifts three metrics (technical, ethical, political), and the shift ends in one of several endings. You play in a browser terminal.
 
 ## Project Structure
 
 - `backend/` – FastAPI backend service with PostgreSQL, Redis, and Celery integrations (see `backend/README.md` for full docs)
-- `frontend/` – Vite + React client for authentication and case management dashboards
+- `frontend/` – Vite + React terminal client (login, account creation, the shift console)
+- `docs/superpowers/plans/` – roadmap and implementation plans
 - `DGD/` – Game design document (`Game Design Document — Nightshift_ Analyst.pdf`)
 - `LICENSE` – MIT license for the project
 
@@ -19,24 +20,19 @@ Detective-themed narrative game that blends investigation mechanics with narrati
    ```
    This boots PostgreSQL, Redis, the FastAPI app, and worker services defined in `docker-compose.yml`. Update the `.env` file with secrets before running in production.
 
-2. **Run migrations**
-   ```bash
-   docker-compose exec backend alembic upgrade head
-   ```
-
-3. **Explore the API**
+2. **Explore the API** (tables are created on startup; Alembic is not set up yet)
    - Swagger UI: http://localhost:8000/docs
    - ReDoc: http://localhost:8000/redoc
 
 Refer to `backend/README.md` for local (non-Docker) setup, testing, linting, and deployment tips.
 
-4. **Run the frontend**
+3. **Run the frontend**
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
-   By default the client points to `http://localhost:8000/api/v1`. Override with `VITE_API_BASE_URL` in a `.env` file if your backend runs elsewhere.
+   By default the client points to `http://localhost:8000/api/v1`. Override with `VITE_API_BASE_URL` in a `.env` file if your backend runs elsewhere. Open http://localhost:5173, create an account, press **Start shift** and type `help`.
 
 ## Game Design Document
 
@@ -45,8 +41,8 @@ The `DGD/` directory contains the authoritative game design document. Review it 
 ## Contributing
 
 1. Create a new branch per feature or fix.
-2. Follow backend coding standards (`black`, `ruff`, `mypy`) before committing.
-3. Ensure tests pass (`pytest`) and update documentation when behavior changes.
+2. Ensure tests pass (`pytest` in `backend/`, `npm test` in `frontend/`) and update documentation when behavior changes.
+3. The game rules live in `backend/app/engine/` as pure functions; content is data in `backend/content/`.
 
 ## License
 

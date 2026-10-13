@@ -16,6 +16,10 @@ EventKind = Literal["info", "message", "outcome", "timeout", "error", "ending"]
 #: GDD's three metrics; ``fatigue`` is a fourth, purely numeric pressure value.
 QUALITIES = ("technical", "ethical", "political", "fatigue")
 
+#: Verbs that gather information or buy time without closing the message: each can be used
+#: once per message, after which the message stays open for a real decision.
+NON_RESOLVING = ("delay", "investigate")
+
 #: Minutes of shift time each verb costs before the outcome's own ``minutes`` is added.
 VERB_MINUTES = {"read": 2, "execute": 5, "deny": 3, "delay": 1, "investigate": 10}
 
@@ -133,7 +137,8 @@ class ShiftState(BaseModel):
     fatigue: int = 0
     announced: List[str] = Field(default_factory=list)
     read: List[str] = Field(default_factory=list)
-    delayed: List[str] = Field(default_factory=list)
+    #: ``"verb:message-id"`` pairs for the non-resolving verbs already used.
+    tried: List[str] = Field(default_factory=list)
     resolved: Dict[str, str] = Field(default_factory=dict)
     flags: List[str] = Field(default_factory=list)
     ending: Optional[str] = None

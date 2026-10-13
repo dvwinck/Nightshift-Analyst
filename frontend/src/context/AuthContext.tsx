@@ -64,7 +64,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         persistSession(authToken, profile);
       } catch (err) {
         clearSession();
-        if (err instanceof ApiError) {
+        if (err instanceof ApiError && err.status === 401) {
+          setError("Your session expired. Please sign in again.");
+        } else if (err instanceof ApiError) {
           setError(err.message);
         } else {
           setError("Unable to refresh user session");

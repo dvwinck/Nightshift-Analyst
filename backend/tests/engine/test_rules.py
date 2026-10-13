@@ -1,3 +1,4 @@
+from app.engine.models import Effects, Response
 from app.engine.rules import apply_command, format_clock, new_shift
 from tests.engine.helpers import tiny_content
 
@@ -73,13 +74,31 @@ def test_metrics_are_clamped_to_0_100():
 def test_delay_once_keeps_the_message_open_and_a_second_delay_is_rejected():
     content, state, _ = _start()
     delayed, _, ok = _read_then(content, state, "delay alert-1")
-    assert ok and "alert-1" not in delayed.resolved and delayed.delayed == ["alert-1"]
+    assert ok and "alert-1" not in delayed.resolved and delayed.tried == ["delay:alert-1"]
 
     again, events, ok = apply_command(delayed, "delay alert-1", content)
 
-    assert not ok and again == delayed and "already delayed" in events[0].text
+    assert not ok and again == delayed and "already used delay" in events[0].text
     done, _, ok = apply_command(delayed, "deny alert-1", content)
     assert ok and done.resolved["alert-1"] == "deny"
+
+
+def test_investigate_gathers_information_but_leaves_the_message_open_for_a_decision():
+    content = tiny_content()
+    content.messages[0].responses["investigate"] = Response(
+        label="Dig", text="You dig.", effects=Effects(set_flags=["dug"], minutes=3)
+    )
+    state, _ = new_shift(content)
+    state, _, _ = apply_command(state, "read alert-1", content)
+
+    dug, events, ok = apply_command(state, "investigate alert-1", content)
+
+    assert ok and "dug" in dug.flags and "alert-1" not in dug.resolved
+    assert dug.clock == state.clock + 10 + 3  # verb cost + effect minutes
+    again, events, ok = apply_command(dug, "investigate alert-1", content)
+    assert not ok and again == dug and "already used investigate" in events[0].text
+    decided, _, ok = apply_command(dug, "execute alert-1", content)
+    assert ok and decided.resolved["alert-1"] == "execute"
 
 
 def test_resolved_messages_cannot_be_acted_on_again():

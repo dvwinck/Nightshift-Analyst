@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.engine.content import CONTENT_DIR, get_shift_content, load_content, validate_content
-from app.engine.models import QUALITIES, ShiftContent
+from app.engine.models import NON_RESOLVING, QUALITIES, ShiftContent
 from app.engine.rules import apply_command, new_shift
 from app.engine.view import build_view
 from tests.engine.helpers import tiny_content
@@ -71,7 +71,7 @@ def _random_playthrough(content, rng, max_steps=400):
                 options.append("read " + message_id)
                 continue
             for verb in message.responses:
-                if verb == "delay" and message_id in state.delayed:
+                if verb in NON_RESOLVING and "%s:%s" % (verb, message_id) in state.tried:
                     continue
                 options.append("%s %s" % (verb, message_id))
         options.append("wait")  # time must be able to pass even with nothing to do
@@ -114,3 +114,14 @@ def test_public_view_never_leaks_unread_bodies_effects_or_requirements():
     state, _, _ = apply_command(state, "read order-773", content)
     opened = next(m for m in build_view(state, content).inbox if m.id == "order-773")
     assert opened.body and [v.verb for v in opened.verbs] == ["execute", "deny", "delay", "investigate"]
+
+
+def test_used_non_resolving_verbs_disappear_from_the_public_view():
+    content = get_shift_content("night_one")
+    state, _ = new_shift(content)
+    state, _, _ = apply_command(state, "read order-773", content)
+    state, _, _ = apply_command(state, "investigate order-773", content)
+
+    opened = next(m for m in build_view(state, content).inbox if m.id == "order-773")
+
+    assert [v.verb for v in opened.verbs] == ["execute", "deny", "delay"]

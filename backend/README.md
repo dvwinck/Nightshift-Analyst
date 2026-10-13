@@ -9,7 +9,7 @@ FastAPI backend for the Nightshift Analyst detective game.
 - **Async Support**: Fully asynchronous API using asyncio and asyncpg
 - **Caching**: Redis for session management and caching
 - **Background Tasks**: Celery for async task processing
-- **API Documentation**: Auto-generated OpenAPI/Swagger docscd b
+- **API Documentation**: Auto-generated OpenAPI/Swagger docs
 - **Type Safety**: Full type hints with Pydantic models
 - **Docker Support**: Containerized deployment with Docker Compose
 
@@ -18,35 +18,22 @@ FastAPI backend for the Nightshift Analyst detective game.
 ```
 backend/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py              # FastAPI application entry point
 │   ├── config.py            # Application configuration
 │   ├── database.py          # Database connection and session management
-│   ├── models/              # SQLModel database models
-│   │   ├── user.py
-│   │   ├── case.py
-│   │   ├── character.py
-│   │   ├── game_state.py
-│   │   └── decision.py
-│   ├── auth/                # Authentication module
-│   │   ├── backend.py       # JWT authentication backend
-│   │   ├── manager.py       # User manager
-│   │   ├── database.py      # User database operations
-│   │   └── users.py         # FastAPI Users instance
-│   └── api/                 # API routes
-│       └── v1/
-│           ├── __init__.py
-│           └── routes/
-│               ├── auth.py
-│               ├── cases.py
-│               ├── characters.py
-│               └── game_state.py
-├── .env.example             # Environment variables template
-├── .gitignore
-├── requirements.txt         # Python dependencies
-├── Dockerfile
-├── docker-compose.yml
-└── README.md
+│   ├── engine/              # PURE game rules (no DB, no HTTP)
+│   │   ├── models.py        #   content / state / event schemas
+│   │   ├── rules.py         #   apply_command(state, raw, content)
+│   │   ├── content.py       #   load + validate shift content
+│   │   └── view.py          #   what the client is allowed to see
+│   ├── services/shifts.py   # load/save state, compare-and-set, action log
+│   ├── models/              # User (fastapi-users) and Shift / ActionLog tables
+│   ├── auth/                # JWT backend, user manager, FastAPI Users instance
+│   └── api/v1/routes/       # auth.py, shifts.py
+├── content/night_one.json   # the first shift, as data
+├── tests/                   # pytest (SQLite in memory); tests/engine for the rules
+├── requirements.txt, Dockerfile, docker-compose.yml, .env.example
+└── pytest.ini
 ```
 
 ## Setup
@@ -138,28 +125,18 @@ Once the server is running, access the interactive API documentation:
 - `GET /api/v1/auth/users/me` - Get current user
 - `PATCH /api/v1/auth/users/me` - Update current user
 
-### Cases
+### Shifts
 
-- `POST /api/v1/cases/` - Create new case
-- `GET /api/v1/cases/` - List all cases for current user
-- `GET /api/v1/cases/{case_id}` - Get specific case
-- `PATCH /api/v1/cases/{case_id}` - Update case
-- `DELETE /api/v1/cases/{case_id}` - Delete case
+All shift routes require a bearer token. The client only ever sends a command; every
+outcome is computed on the server.
 
-### Characters
+- `POST /api/v1/shifts/` - Start a shift (409 while one is in progress)
+- `GET /api/v1/shifts/current` - Latest shift: clock, metrics and inbox (unread bodies are never sent)
+- `POST /api/v1/shifts/current/commands` - Body `{"command": "read order-773"}`. A rejected command answers 200 with `accepted: false`
+- `GET /api/v1/shifts/current/log?limit=100` - Replay of the last commands, oldest first
 
-- `POST /api/v1/characters/` - Create new character
-- `GET /api/v1/characters/case/{case_id}` - List characters for a case
-- `GET /api/v1/characters/{character_id}` - Get specific character
-- `PATCH /api/v1/characters/{character_id}` - Update character
-- `DELETE /api/v1/characters/{character_id}` - Delete character
-
-### Game State
-
-- `POST /api/v1/game-state/` - Create game state
-- `GET /api/v1/game-state/me` - Get current user's game state
-- `PATCH /api/v1/game-state/me` - Update game state
-- `DELETE /api/v1/game-state/me` - Delete game state
+Commands: `help`, `status`, `inbox`, `read <id>`, `execute|deny <id>`, `delay <id>` and `investigate <id>`
+(once per message, the message stays open), `wait [minutes]`, `clockout`.
 
 ## Environment Variables
 
@@ -183,42 +160,23 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 
 ## Database Models
 
-### User
-- Authentication and user profile
-- Linked to game state
-
-### Case
-- Investigation cases with difficulty levels
-- Tracks completion status and time limits
-- Contains evidence and clues
-
-### Character
-- NPCs in cases (suspects, witnesses, victims)
-- Personality traits and dialogue history
-- Suspicion and trust levels
-
-### GameState
-- Player progression and statistics
-- Current day, stress, reputation
-- Unlocked features and achievements
-
-### Decision
-- Player choices during investigations
-- Links to cases and characters
-- Tracks outcomes and impacts
+- **User** - fastapi-users account (email, username, password hash, flags)
+- **Shift** - one play-through: serialized `ShiftState`, `version` for optimistic concurrency, start/end times. A partial unique index allows one unfinished shift per user
+- **ActionLog** - every command a player sent (accepted or not) with the events it produced
 
 ## Testing
 
-Run tests with pytest:
+Run tests with pytest (no database or Redis needed; it uses in-memory SQLite):
 
 ```bash
 pytest
+pytest tests/engine   # rules engine only
 ```
 
 Run tests with coverage:
 
 ```bash
-pytest --cov=app tests/
+pytest --cov=app
 ```
 
 ## Code Quality

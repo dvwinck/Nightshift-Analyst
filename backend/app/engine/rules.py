@@ -8,6 +8,7 @@ this function, and stores the result.
 from typing import List, Optional, Tuple
 
 from app.engine.models import (
+    NON_RESOLVING,
     QUALITIES,
     VERB_MINUTES,
     Condition,
@@ -21,7 +22,7 @@ from app.engine.models import (
 
 #: Commands that cost no shift time.
 FREE_COMMANDS = ("help", "status", "inbox")
-#: Verbs that resolve (or, for ``delay``, postpone) a message.
+#: Verbs a player can use on a message (see ``NON_RESOLVING`` for the ones that keep it open).
 RESPONSE_VERBS = ("execute", "deny", "delay", "investigate")
 #: ``wait`` passes this long by default, and at most ``MAX_WAIT_MINUTES`` per command.
 DEFAULT_WAIT_MINUTES = 15
@@ -119,7 +120,8 @@ def _free_command(verb: str, state: ShiftState, content: ShiftContent) -> List[E
             "status               clock and metrics",
             "inbox                open messages",
             "read <id>            read a message (2 min)",
-            "execute|deny|delay|investigate <id>   act on a message you have read",
+            "execute|deny <id>    decide a message you have read",
+            "delay|investigate <id>   once per message; keeps it open",
             "wait [minutes]       let time pass (default 15, max 60)",
             "clockout             end the shift now",
         ]
@@ -182,10 +184,11 @@ def _message_command(
     response = message.responses.get(verb)  # type: ignore[call-overload]
     if response is None:
         return "%s cannot be used on %s." % (verb, message_id)
-    if verb == "delay":
-        if message_id in state.delayed:
-            return "%s was already delayed once." % message_id
-        state.delayed.append(message_id)
+    if verb in NON_RESOLVING:
+        attempt = "%s:%s" % (verb, message_id)
+        if attempt in state.tried:
+            return "You already used %s on %s." % (verb, message_id)
+        state.tried.append(attempt)
     else:
         state.resolved[message_id] = verb
 

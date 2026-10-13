@@ -1,6 +1,6 @@
 # Nightshift Analyst – Frontend
 
-First pass of the Nightshift Analyst client application. Built with Vite, React, and TypeScript to cover authentication and core case-management flows against the FastAPI backend.
+The Nightshift: Analyst terminal client. Built with Vite, React, and TypeScript against the FastAPI backend: you read messages, type commands, and the server decides the consequences.
 
 ## Prerequisites
 
@@ -35,24 +35,24 @@ The service mounts your working directory for hot reloading. Override the API en
 - `npm run dev` – start the Vite dev server with hot module replacement
 - `npm run build` – type-check and generate a production build
 - `npm run preview` – serve the production build locally
+- `npm test` – run the Vitest suite
 
 ## Project Layout
 
-- `src/api/` – lightweight fetch wrappers for authentication and case CRUD
-- `src/components/` – reusable UI elements (layout shell, case cards, forms)
+- `src/api/` – fetch wrappers (`client.ts` handles auth headers and error messages, `shifts.ts` the game API)
+- `src/hooks/useShift.ts` – owns the shift view and terminal scrollback
+- `src/terminal/` – pure helpers: command echo/log lines, Tab completion
+- `src/components/` – `Hud`, `Inbox`, `CommandInput`, layout shell
+- `src/pages/` – `LoginPage` (sign in / create account) and `TerminalPage`
 - `src/context/` – React context for session management
-- `src/pages/` – route-level screens (login, dashboard)
-- `src/styles/` – global styling primitives
 
-## Current Functionality
+## How to play
 
-- JWT login (FastAPI Users) with session persistence
-- Fetch, display, and create investigation cases for the authenticated analyst
-- Basic dark-theme styling tuned for the detective dashboard aesthetic
+Create an account, press **Start shift** and type `help`. Messages arrive as time passes: `read` one, then
+`execute`, `deny`, `delay` or `investigate` it. `wait` lets time pass; `Tab` completes, arrow keys recall history.
 
 ## Next Steps
 
-- Wire registration and password resets to the corresponding auth endpoints
-- Add case detail views and editing, including evidence breakdowns
-- Integrate character and game-state endpoints once exposed in the backend
-- Layer in automated tests (React Testing Library, Playwright) as flows mature
+- Real-time message feed (SSE) instead of command-driven time
+- Playwright end-to-end test of a full shift
+- Decide React vs. the GDD's SvelteKit before the UI grows

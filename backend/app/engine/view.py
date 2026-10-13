@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from app.engine.models import ShiftContent, ShiftState
+from app.engine.models import NON_RESOLVING, ShiftContent, ShiftState
 from app.engine.rules import format_clock, open_messages
 
 
@@ -61,9 +61,11 @@ def build_view(state: ShiftState, content: ShiftContent) -> ShiftView:
                 title=message.title,
                 read=is_read,
                 body=message.body if is_read else None,
-                verbs=[VerbView(verb=v, label=r.label) for v, r in message.responses.items()]
-                if is_read
-                else [],
+                verbs=[
+                    VerbView(verb=v, label=r.label)
+                    for v, r in message.responses.items()
+                    if is_read and not (v in NON_RESOLVING and "%s:%s" % (v, message_id) in state.tried)
+                ],
             )
         )
     ending = None
